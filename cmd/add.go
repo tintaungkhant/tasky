@@ -59,12 +59,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repoRoot, err := resolveRepo(cfg, cwd, repoArg)
-	if err != nil {
-		return err
-	}
-
-	root, err := cfg.MatchRoot(repoRoot)
+	repoRoot, root, err := resolveRepo(cfg, cwd, repoArg)
 	if err != nil {
 		return err
 	}
@@ -78,6 +73,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		if branch, err = promptText("Branch name"); err != nil {
 			return err
 		}
+	}
+
+	if err := os.MkdirAll(root.TasksDir, 0o755); err != nil {
+		return fmt.Errorf("create tasks directory %s: %w", root.TasksDir, err)
 	}
 
 	repoName := filepath.Base(repoRoot)
@@ -196,11 +195,12 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// resolveRepo determines the repo's root directory. When cwd is inside a
-// Git repo, that repo is used (unless repoArg overrides it). Otherwise cwd
-// is treated as a Root directory: repoArg selects the repo explicitly, or
-// (if empty) the developer is prompted to pick one of the Root's repos.
-func resolveRepo(cfg *config.Config, cwd, repoArg string) (string, error) {
+// resolveRepo determines the repo's root directory and its configured Root.
+// When cwd is inside a Git repo, that repo is used (unless repoArg overrides
+// it). Otherwise cwd is treated as a Root directory: repoArg selects the
+// repo explicitly, or (if empty) the developer is prompted to pick one of
+// the Root's repos.
+func resolveRepo(cfg *config.Config, cwd, repoArg string) (string, *config.Root, error) {
 	repoRoot, insideRepo := "", true
 	toplevel, err := git.Toplevel(cwd)
 	if err != nil {
@@ -215,13 +215,16 @@ func resolveRepo(cfg *config.Config, cwd, repoArg string) (string, error) {
 	}
 	root, err := cfg.MatchRoot(rootDir)
 	if err != nil {
-		return "", err
+		return "", nil, err
+	}
+	if _, err := os.Stat(root.Path); err != nil {
+		return "", nil, fmt.Errorf("root %q is misconfigured: path %s not found on disk (check `tasky setup`)", root.Name, root.Path)
 	}
 
 	if repoArg != "" {
 		entries, err := os.ReadDir(root.Path)
 		if err != nil {
-			return "", fmt.Errorf("read root directory: %w", err)
+			return "", nil, fmt.Errorf("read root directory: %w", err)
 		}
 		found := false
 		for _, e := range entries {
@@ -232,21 +235,21 @@ func resolveRepo(cfg *config.Config, cwd, repoArg string) (string, error) {
 		}
 		candidate := filepath.Join(root.Path, repoArg)
 		if !found || !git.IsRepo(candidate) {
-			return "", fmt.Errorf("repo %q not found under root %s (expected a directory containing .git)", repoArg, root.Path)
+			return "", nil, fmt.Errorf("repo %q not found under root %s (expected a directory containing .git)", repoArg, root.Path)
 		}
-		return candidate, nil
+		return candidate, root, nil
 	}
 
 	if insideRepo {
-		return repoRoot, nil
+		return repoRoot, root, nil
 	}
 
 	repos, err := listRepos(root.Path)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if len(repos) == 0 {
-		return "", fmt.Errorf("no git repositories found under root %s", root.Path)
+		return "", nil, fmt.Errorf("no git repositories found under root %s", root.Path)
 	}
 
 	var selected string
@@ -260,9 +263,9 @@ func resolveRepo(cfg *config.Config, cwd, repoArg string) (string, error) {
 		),
 	)
 	if err := form.Run(); err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return filepath.Join(root.Path, selected), nil
+	return filepath.Join(root.Path, selected), root, nil
 }
 
 // listRepos returns the names of rootPath's direct subdirectories that are Git repos.

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tintaungkhant/tasky/internal/config"
+	"github.com/tintaungkhant/tasky/internal/git"
 )
 
 func runGit(t *testing.T, dir string, args ...string) {
@@ -165,6 +166,95 @@ func TestAddFromFlagOverridesBase(t *testing.T) {
 	wantWorktree := filepath.Join(tasksDir, "CRO-004-base", "project-a")
 	if got := currentBranch(t, wantWorktree); got != "task/CRO-004-base/feat/x" {
 		t.Fatalf("worktree branch = %q, want task/CRO-004-base/feat/x", got)
+	}
+}
+
+func TestAddWorktreePathAlreadyExists(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	chdir(t, repoPath)
+
+	existing := filepath.Join(tasksDir, "CRO-006-collide", "project-a")
+	if err := os.MkdirAll(existing, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := execAdd(t, "CRO-006-collide", "feat/x")
+	if err == nil {
+		t.Fatal("expected error for pre-existing worktree path")
+	}
+
+	branches, lerr := git.ListLocalBranches(repoPath)
+	if lerr != nil {
+		t.Fatal(lerr)
+	}
+	if contains(branches, "task/CRO-006-collide/feat/x") {
+		t.Fatal("branch should not have been created when worktree path already existed")
+	}
+}
+
+func TestAddNoMatchingRoot(t *testing.T) {
+	_, _, _ = setupRootWithRepo(t)
+	outsideDir := t.TempDir()
+	chdir(t, outsideDir)
+
+	err := execAdd(t, "CRO-007", "feat/x")
+	if err == nil {
+		t.Fatal("expected error for cwd outside any configured root")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("tasky setup")) {
+		t.Fatalf("error = %q, want it to mention `tasky setup`", err.Error())
+	}
+}
+
+func TestAddTasksDirAutoCreated(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	if err := os.RemoveAll(tasksDir); err != nil {
+		t.Fatal(err)
+	}
+	chdir(t, repoPath)
+
+	if err := execAdd(t, "CRO-008-autocreate", "feat/x"); err != nil {
+		t.Fatalf("tasky add: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tasksDir, "CRO-008-autocreate", "project-a")); err != nil {
+		t.Fatalf("tasks_dir not auto-created: %v", err)
+	}
+}
+
+func TestAddRootPathMissingOnDisk(t *testing.T) {
+	root, _, _ := setupRootWithRepo(t)
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// Call resolveRepo directly with cwd passed as a plain string: exercising
+	// this via a real os.Chdir would leave the process's cwd pointing at a
+	// directory that no longer exists, which is unreliable across platforms.
+	_, _, rerr := resolveRepo(cfg, root, "project-a")
+	if rerr == nil {
+		t.Fatal("expected misconfiguration error for missing root path")
+	}
+}
+
+func TestAddGitFailureWrapped(t *testing.T) {
+	_, repoPath, _ := setupRootWithRepo(t)
+	chdir(t, repoPath)
+
+	defer func() { addFromFlag = "" }()
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+	rootCmd.SetArgs([]string{"add", "--from", "does-not-exist", "CRO-010", "feat/x"})
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for nonexistent base branch")
+	}
+	if bytes.Contains([]byte(err.Error()), []byte("exit status")) {
+		t.Fatalf("error leaked raw exec.ExitError: %q", err.Error())
 	}
 }
 
