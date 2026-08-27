@@ -10,32 +10,42 @@ import (
 	"github.com/tintaungkhant/tasky/internal/config"
 )
 
-func TestAddHappyPathEndToEnd(t *testing.T) {
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func initTestRepo(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, dir, "init", "-b", "main")
+	runGit(t, dir, "config", "user.email", "test@example.com")
+	runGit(t, dir, "config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, dir, "add", "README.md")
+	runGit(t, dir, "commit", "-m", "init")
+}
+
+// setupRootWithRepo creates a Root at a fresh temp dir with one repo
+// ("project-a") inside it, points TASKY_CONFIG at a fresh config with that
+// Root registered, and returns (rootPath, repoPath, tasksDir).
+func setupRootWithRepo(t *testing.T) (rootPath, repoPath, tasksDir string) {
+	t.Helper()
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	repoPath := filepath.Join(root, "project-a")
-	tasksDir := filepath.Join(root, "tasks")
-	if err := os.MkdirAll(repoPath, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	runGit := func(dir string, args ...string) {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	runGit(repoPath, "init", "-b", "main")
-	runGit(repoPath, "config", "user.email", "test@example.com")
-	runGit(repoPath, "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(repoPath, "README.md"), []byte("hi"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	runGit(repoPath, "add", "README.md")
-	runGit(repoPath, "commit", "-m", "init")
+	repoPath = filepath.Join(root, "project-a")
+	tasksDir = filepath.Join(root, "tasks")
+	initTestRepo(t, repoPath)
 
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	t.Setenv("TASKY_CONFIG", configPath)
@@ -49,20 +59,46 @@ func TestAddHappyPathEndToEnd(t *testing.T) {
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
+	return root, repoPath, tasksDir
+}
 
+func chdir(t *testing.T, dir string) {
+	t.Helper()
 	origWd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(repoPath); err != nil {
+	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(origWd) })
+}
 
+func execAdd(t *testing.T, args ...string) error {
+	t.Helper()
+	addFromFlag = ""
 	var out bytes.Buffer
 	rootCmd.SetOut(&out)
-	rootCmd.SetArgs([]string{"add", "CRO-001-payment", "feat/payment"})
-	if err := rootCmd.Execute(); err != nil {
+	rootCmd.SetArgs(append([]string{"add"}, args...))
+	return rootCmd.Execute()
+}
+
+func currentBranch(t *testing.T, dir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "branch", "--show-current")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git branch --show-current: %v", err)
+	}
+	return string(bytes.TrimSpace(out))
+}
+
+func TestAddHappyPathEndToEnd(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	chdir(t, repoPath)
+
+	if err := execAdd(t, "CRO-001-payment", "feat/payment"); err != nil {
 		t.Fatalf("tasky add: %v", err)
 	}
 
@@ -70,15 +106,80 @@ func TestAddHappyPathEndToEnd(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(wantWorktree, "README.md")); err != nil {
 		t.Fatalf("worktree not created at %s: %v", wantWorktree, err)
 	}
-
-	branchCmd := exec.Command("git", "branch", "--show-current")
-	branchCmd.Dir = wantWorktree
-	branchOut, err := branchCmd.Output()
-	if err != nil {
-		t.Fatalf("git branch --show-current: %v", err)
+	if got := currentBranch(t, wantWorktree); got != "task/CRO-001-payment/feat/payment" {
+		t.Fatalf("worktree branch = %q, want task/CRO-001-payment/feat/payment", got)
 	}
-	gotBranch := string(bytes.TrimSpace(branchOut))
-	if gotBranch != "task/CRO-001-payment/feat/payment" {
-		t.Fatalf("worktree branch = %q, want task/CRO-001-payment/feat/payment", gotBranch)
+}
+
+func TestAddExplicitRepoFromRootDir(t *testing.T) {
+	root, _, tasksDir := setupRootWithRepo(t)
+	chdir(t, root)
+
+	if err := execAdd(t, "project-a", "CRO-002-refund", "feat/refund"); err != nil {
+		t.Fatalf("tasky add: %v", err)
+	}
+
+	wantWorktree := filepath.Join(tasksDir, "CRO-002-refund", "project-a")
+	if _, err := os.Stat(filepath.Join(wantWorktree, "README.md")); err != nil {
+		t.Fatalf("worktree not created at %s: %v", wantWorktree, err)
+	}
+	if got := currentBranch(t, wantWorktree); got != "task/CRO-002-refund/feat/refund" {
+		t.Fatalf("worktree branch = %q, want task/CRO-002-refund/feat/refund", got)
+	}
+}
+
+func TestAddRepoArgNotFound(t *testing.T) {
+	root, _, _ := setupRootWithRepo(t)
+	chdir(t, root)
+
+	err := execAdd(t, "does-not-exist", "CRO-003", "feat/x")
+	if err == nil {
+		t.Fatal("expected error for unknown repo arg")
+	}
+}
+
+func TestAddRepoArgCaseSensitive(t *testing.T) {
+	root, _, _ := setupRootWithRepo(t)
+	chdir(t, root)
+
+	err := execAdd(t, "Project-A", "CRO-003", "feat/x")
+	if err == nil {
+		t.Fatal("expected error for case-mismatched repo arg")
+	}
+}
+
+func TestAddFromFlagOverridesBase(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	runGit(t, repoPath, "checkout", "-b", "develop")
+	runGit(t, repoPath, "checkout", "main")
+	chdir(t, repoPath)
+
+	defer func() { addFromFlag = "" }()
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+	rootCmd.SetArgs([]string{"add", "--from", "develop", "CRO-004-base", "feat/x"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("tasky add: %v", err)
+	}
+
+	wantWorktree := filepath.Join(tasksDir, "CRO-004-base", "project-a")
+	if got := currentBranch(t, wantWorktree); got != "task/CRO-004-base/feat/x" {
+		t.Fatalf("worktree branch = %q, want task/CRO-004-base/feat/x", got)
+	}
+}
+
+func TestAddExistingBranchReuse(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	renderedBranch := "task/CRO-005-existing/feat/x"
+	runGit(t, repoPath, "branch", renderedBranch)
+	chdir(t, repoPath)
+
+	if err := execAdd(t, "CRO-005-existing", "feat/x"); err != nil {
+		t.Fatalf("tasky add: %v", err)
+	}
+
+	wantWorktree := filepath.Join(tasksDir, "CRO-005-existing", "project-a")
+	if got := currentBranch(t, wantWorktree); got != renderedBranch {
+		t.Fatalf("worktree branch = %q, want %q", got, renderedBranch)
 	}
 }

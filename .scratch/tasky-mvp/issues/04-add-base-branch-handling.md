@@ -4,9 +4,9 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `--from <base>` flag on `tasky add`: overrides current-branch-as-base default, used directly as the base for `git worktree add -b`
-- [ ] `internal/git`: list local branches, get current branch — used for base-branch resolution
-- [ ] Existing-branch detection: if a local branch matching the *rendered* branch name already exists, use it as-is (no `-b`, no base-branch question) instead of treating it as a new branch
-- [ ] `internal/git` integration tests: branch listing, current-branch detection, and worktree-add-without-`-b` against an existing branch, all against real temp repos
+- [x] `--from <base>` flag on `tasky add`: overrides current-branch-as-base default, used directly as the base for `git worktree add -b`
+- [x] `internal/git`: list local branches, get current branch — used for base-branch resolution
+- [x] Existing-branch detection: if a local branch matching the *rendered* branch name already exists, use it as-is (no `-b`, no base-branch question) instead of treating it as a new branch
+- [x] `internal/git` integration tests: branch listing, current-branch detection, and worktree-add-without-`-b` against an existing branch, all against real temp repos

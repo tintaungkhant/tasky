@@ -101,3 +101,40 @@ func TestWorktreeAddNewBranchErrorWrapped(t *testing.T) {
 		t.Fatal("expected error for missing base branch")
 	}
 }
+
+func TestListLocalBranches(t *testing.T) {
+	repo := initRepo(t)
+
+	cmd := exec.Command("git", "branch", "feat/payment")
+	cmd.Dir = repo
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git branch: %v\n%s", err, out)
+	}
+
+	branches, err := ListLocalBranches(repo)
+	if err != nil {
+		t.Fatalf("ListLocalBranches: %v", err)
+	}
+
+	want := map[string]bool{"main": true, "feat/payment": true}
+	if len(branches) != len(want) {
+		t.Fatalf("ListLocalBranches = %v, want keys of %v", branches, want)
+	}
+	for _, b := range branches {
+		if !want[b] {
+			t.Fatalf("unexpected branch %q in %v", b, branches)
+		}
+	}
+}
+
+func TestIsRepo(t *testing.T) {
+	repo := initRepo(t)
+	if !IsRepo(repo) {
+		t.Fatalf("IsRepo(%q) = false, want true", repo)
+	}
+
+	notRepo := t.TempDir()
+	if IsRepo(notRepo) {
+		t.Fatalf("IsRepo(%q) = true, want false", notRepo)
+	}
+}

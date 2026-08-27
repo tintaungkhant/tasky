@@ -4,7 +4,9 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -46,4 +48,22 @@ func WorktreeAddNewBranch(repoDir, path, branch, base string) error {
 func WorktreeAddExistingBranch(repoDir, path, branch string) error {
 	_, err := run(repoDir, "worktree", "add", path, branch)
 	return err
+}
+
+// ListLocalBranches returns the names of all local branches in the repo at dir.
+func ListLocalBranches(dir string) ([]string, error) {
+	out, err := run(dir, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	if err != nil {
+		return nil, err
+	}
+	if out == "" {
+		return nil, nil
+	}
+	return strings.Split(out, "\n"), nil
+}
+
+// IsRepo reports whether path is the root of a Git repository (contains a .git entry).
+func IsRepo(path string) bool {
+	_, err := os.Stat(filepath.Join(path, ".git"))
+	return err == nil
 }

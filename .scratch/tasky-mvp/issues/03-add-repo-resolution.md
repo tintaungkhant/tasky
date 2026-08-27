@@ -4,9 +4,9 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `tasky add <repo> <task-id> <branch>` run from a root directory: Root auto-detected from cwd, Repo taken from the explicit arg (exact, case-sensitive match)
-- [ ] Repo validation: whichever way the repo was determined (cwd, arg, or prompt), confirm it's an actual git repo (`.git` present) before proceeding — clear error otherwise (bad arg, typo, non-repo dir)
-- [ ] `tasky add` run from a root directory with no repo arg: prompt-select listing only subdirectories of the root's `path` that contain `.git` (excludes `tasks_dir` and other clutter)
-- [ ] Unit/integration coverage for repo validation and the filtered listing logic
+- [x] `tasky add <repo> <task-id> <branch>` run from a root directory: Root auto-detected from cwd, Repo taken from the explicit arg (exact, case-sensitive match)
+- [x] Repo validation: whichever way the repo was determined (cwd, arg, or prompt), confirm it's an actual git repo (`.git` present) before proceeding — clear error otherwise (bad arg, typo, non-repo dir)
+- [x] `tasky add` run from a root directory with no repo arg: prompt-select listing only subdirectories of the root's `path` that contain `.git` (excludes `tasks_dir` and other clutter)
+- [x] Unit/integration coverage for repo validation and the filtered listing logic
