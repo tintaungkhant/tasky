@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -99,19 +100,30 @@ func promptAction(cfg *config.Config) (string, error) {
 
 func addRoot(cfg *config.Config) error {
 	var r config.Root
-	form := huh.NewForm(
+	nameAndPath := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Title("Root name").Value(&r.Name).Validate(requireNonEmpty),
 			huh.NewInput().Title("Root path (absolute)").Value(&r.Path).Validate(requireNonEmpty),
+		),
+	)
+	if err := nameAndPath.Run(); err != nil {
+		return err
+	}
+
+	r.TasksDir = filepath.Join(r.Path, "tasks")
+	r.BranchTemplate = "{branch}"
+	rest := huh.NewForm(
+		huh.NewGroup(
 			huh.NewInput().Title("Tasks directory (absolute)").Value(&r.TasksDir).Validate(requireNonEmpty),
 			huh.NewInput().Title("Branch template").
 				Description("Use {task-id} and {branch} placeholders, e.g. task/{task-id}/{branch}").
 				Value(&r.BranchTemplate).Validate(requireNonEmpty),
 		),
 	)
-	if err := form.Run(); err != nil {
+	if err := rest.Run(); err != nil {
 		return err
 	}
+
 	cfg.AddRoot(r)
 	return nil
 }
