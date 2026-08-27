@@ -4,12 +4,12 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `internal/task`: renders the resolved Root's Branch Template, substituting `{task-id}` and `{branch}` verbatim (no truncation/sanitization)
-- [ ] `internal/task`: computes worktree path as `<tasks_dir>/<task-id>/<repo-name>`
-- [ ] `internal/git`: `worktree add -b <rendered-branch> <path> <base>` invocation, shelling out to `git`, wrapping stderr into a clean error (no raw stack traces)
-- [ ] `tasky add <task-id> <branch>` run inside a repo: Root auto-detected from cwd via `git rev-parse --show-toplevel` + root-match, Repo name = basename of repo root, base branch = current branch, no prompts, no confirmation — worktree created directly
-- [ ] Table-driven unit tests for `internal/task` (template rendering, path calc)
-- [ ] Integration test for `internal/git` worktree creation against a real temp repo (`t.TempDir()` + `git init`)
-- [ ] Smoke test: `tasky add` with full args against a temp root produces the expected worktree end-to-end
+- [x] `internal/task`: renders the resolved Root's Branch Template, substituting `{task-id}` and `{branch}` verbatim (no truncation/sanitization)
+- [x] `internal/task`: computes worktree path as `<tasks_dir>/<task-id>/<repo-name>`
+- [x] `internal/git`: `worktree add -b <rendered-branch> <path> <base>` invocation, shelling out to `git`, wrapping stderr into a clean error (no raw stack traces)
+- [x] `tasky add <task-id> <branch>` run inside a repo: Root auto-detected from cwd via `git rev-parse --show-toplevel` + root-match, Repo name = basename of repo root, base branch = current branch, no prompts, no confirmation — worktree created directly
+- [x] Table-driven unit tests for `internal/task` (template rendering, path calc)
+- [x] Integration test for `internal/git` worktree creation against a real temp repo (`t.TempDir()` + `git init`)
+- [x] Smoke test: `tasky add` with full args against a temp root produces the expected worktree end-to-end
