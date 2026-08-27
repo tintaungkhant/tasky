@@ -19,8 +19,19 @@ var addFromFlag string
 var addCmd = &cobra.Command{
 	Use:   "add [repo] <task-id> <branch>",
 	Short: "Create a task-scoped Git worktree",
-	Args:  cobra.RangeArgs(2, 3),
+	Args:  addArgsValidator,
 	RunE:  runAdd,
+}
+
+// addArgsValidator accepts 0 args (fully interactive), or 2/3 args
+// (task-id + branch, optionally preceded by an explicit repo).
+func addArgsValidator(cmd *cobra.Command, args []string) error {
+	switch len(args) {
+	case 0, 2, 3:
+		return nil
+	default:
+		return fmt.Errorf("accepts 0, 2, or 3 arg(s), received %d", len(args))
+	}
 }
 
 func init() {
@@ -29,10 +40,12 @@ func init() {
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
+	interactive := len(args) == 0
+
 	var repoArg, taskID, branch string
 	if len(args) == 3 {
 		repoArg, taskID, branch = args[0], args[1], args[2]
-	} else {
+	} else if len(args) == 2 {
 		taskID, branch = args[0], args[1]
 	}
 
@@ -56,10 +69,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	base := addFromFlag
-	if base == "" {
-		base, err = git.CurrentBranch(repoRoot)
-		if err != nil {
+	if taskID == "" {
+		if taskID, err = promptText("Task ID"); err != nil {
+			return err
+		}
+	}
+	if branch == "" {
+		if branch, err = promptText("Branch name"); err != nil {
 			return err
 		}
 	}
@@ -76,8 +92,34 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	reuseExisting := contains(branches, renderedBranch)
 
-	if contains(branches, renderedBranch) {
+	base := addFromFlag
+	if !reuseExisting && base == "" {
+		currentBranch, err := git.CurrentBranch(repoRoot)
+		if err != nil {
+			return err
+		}
+		if interactive {
+			if base, err = promptSelectBase(branches, currentBranch); err != nil {
+				return err
+			}
+		} else {
+			base = currentBranch
+		}
+	}
+
+	if interactive {
+		confirmed, err := confirmCreate(taskID, repoName, base, renderedBranch, worktreePath, reuseExisting)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			return fmt.Errorf("aborted")
+		}
+	}
+
+	if reuseExisting {
 		if err := git.WorktreeAddExistingBranch(repoRoot, worktreePath, renderedBranch); err != nil {
 			return err
 		}
@@ -90,6 +132,59 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Created worktree at %s (branch %s, from %s)\n", worktreePath, renderedBranch, base)
 	return nil
+}
+
+func promptText(title string) (string, error) {
+	var value string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Title(title).Value(&value).Validate(requireNonEmpty),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
+func promptSelectBase(branches []string, current string) (string, error) {
+	options := make([]huh.Option[string], 0, len(branches))
+	for _, b := range branches {
+		options = append(options, huh.NewOption(b, b))
+	}
+	base := current
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Title("Base branch").Options(options...).Value(&base),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return "", err
+	}
+	return base, nil
+}
+
+func confirmCreate(taskID, repoName, base, branch, worktreePath string, reuseExisting bool) (bool, error) {
+	fmt.Println("Task:      ", taskID)
+	fmt.Println("Repository:", repoName)
+	if reuseExisting {
+		fmt.Println("Branch:    ", branch, "(existing)")
+	} else {
+		fmt.Println("Base:      ", base)
+		fmt.Println("Branch:    ", branch)
+	}
+	fmt.Println("Worktree:  ", worktreePath)
+
+	confirmed := true
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().Title("Create worktree?").Value(&confirmed),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return false, err
+	}
+	return confirmed, nil
 }
 
 func contains(list []string, s string) bool {
