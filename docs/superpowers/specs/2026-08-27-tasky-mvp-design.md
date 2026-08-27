@@ -81,7 +81,9 @@ roots:
 - Fully-interactive mode: after branch name is entered, check if a local branch with the *rendered* name already exists. If yes, skip the base-branch question (already answered or irrelevant) and treat as "use existing branch" — no `-b` flag. If no, proceed with base-branch selection and "create new branch" semantics.
 - Arg-based mode: no existing-branch detection: the branch name argument is rendered through the template and passed straight to `git worktree add`; if it happens to already exist, git's own behavior applies (new branch creation with `-b` on an existing branch name errors — surfaced to the user, not swallowed).
 
-**Branch name rendering:** apply the resolved root's `branch_template`, substituting `{task-id}` and `{branch}`. Example: template `task/{task-id}/{branch}`, task-id `CRO-001`, branch `feat/payment` → `task/CRO-001/feat/payment`.
+**Branch name rendering:** apply the resolved root's `branch_template`, substituting `{task-id}` and `{branch}` verbatim (no truncation, no sanitization — see Task ID in [CONTEXT.md](../../../CONTEXT.md)). Example: template `task/{task-id}/{branch}`, task-id `CRO-001-payment`, branch `feat/payment` → `task/CRO-001-payment/feat/payment`. Invalid git ref characters are not validated by `tasky` — `git` rejects them and its error surfaces to the user.
+
+**Repo validation:** whether the repo is cwd-detected, given as a positional arg, or picked from a prompt, `tasky` confirms it's an actual git repo (`.git` present / `git rev-parse --show-toplevel` succeeds) before proceeding — clear error otherwise. Matching a repo name from an arg is exact, case-sensitive. The root-level interactive repo picker lists only subdirectories of the root's `path` that contain `.git`, which naturally excludes `tasks_dir` and other non-repo clutter without a special-case rule.
 
 **Worktree path:** `<tasks_dir>/<task-id>/<repo-name>`.
 
