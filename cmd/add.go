@@ -77,12 +77,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	reusableBranches := make([]string, 0, len(branches))
-	for _, b := range branches {
-		if _, busy := checkedOut[b]; !busy {
-			reusableBranches = append(reusableBranches, b)
-		}
-	}
 
 	taskEntries, err := listTaskEntries(root.TasksDir)
 	if err != nil {
@@ -125,7 +119,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	var branchAlreadyRendered bool
 	if branch == "" {
-		if branch, branchAlreadyRendered, err = promptBranchStep(reusableBranches, taskID, taskName, base, root.BranchTemplate); err != nil {
+		if branch, branchAlreadyRendered, err = promptBranchStep(taskID, taskName, base, root.BranchTemplate); err != nil {
 			return err
 		}
 	}
@@ -227,35 +221,14 @@ func promptSelectOrNew(selectTitle, inputTitle string, options []string) (value 
 	return v, true, err
 }
 
-// promptBranchStep resolves the worktree's branch interactively. Existing
-// (reusable) branches are offered directly, alongside a "+ New" entry that
-// prompts for free text, pre-filled with base. Leaving that text unchanged
-// or clearing it means "use the base branch", which then asks whether to use
-// base verbatim or with the configured template prefix applied. alreadyRendered
-// reports whether the returned branch is already final and must not be passed
-// through task.RenderBranch again.
-func promptBranchStep(reusable []string, taskID, taskName, base, template string) (branch string, alreadyRendered bool, err error) {
-	if len(reusable) > 0 {
-		huhOptions := make([]huh.Option[string], 0, len(reusable)+1)
-		for _, b := range reusable {
-			huhOptions = append(huhOptions, huh.NewOption(b, b))
-		}
-		huhOptions = append(huhOptions, huh.NewOption("+ New", newOptionValue))
-
-		var selected string
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().Title("Branch").Options(huhOptions...).Value(&selected),
-			),
-		)
-		if err := form.Run(); err != nil {
-			return "", false, err
-		}
-		if selected != newOptionValue {
-			return selected, false, nil
-		}
-	}
-
+// promptBranchStep resolves the worktree's branch interactively. The
+// developer types a branch name, pre-filled with base (leaving it unchanged
+// or clearing it means "use base itself" — e.g. to reuse an existing branch
+// picked as base). Whatever name results (base or typed) is then offered
+// as-is or with the configured template prefix applied, unless the template
+// makes no difference. alreadyRendered reports whether the returned branch
+// is already final and must not be passed through task.RenderBranch again.
+func promptBranchStep(taskID, taskName, base, template string) (branch string, alreadyRendered bool, err error) {
 	var typed string
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -267,29 +240,35 @@ func promptBranchStep(reusable []string, taskID, taskName, base, template string
 	}
 	typed = strings.TrimSpace(typed)
 
-	if typed != "" {
-		return typed, false, nil
+	candidate := typed
+	if candidate == "" {
+		candidate = base
 	}
 
-	rendered := task.RenderBranch(template, taskID, taskName, base)
-	if rendered == base {
-		return base, false, nil
+	rendered := task.RenderBranch(template, taskID, taskName, candidate)
+	if rendered == candidate {
+		return candidate, true, nil
 	}
 
 	options := []huh.Option[string]{
-		huh.NewOption(base+" (as-is)", base),
+		huh.NewOption(candidate+" (as-is)", candidate),
 		huh.NewOption(rendered+" (with prefix)", rendered),
 	}
-	selected := base
+	// Reusing base as-is (blank input) defaults to as-is; typing a distinct
+	// new name defaults to the prefixed form, since that's the template's point.
+	selected := candidate
+	if typed != "" {
+		selected = rendered
+	}
 	pickForm := huh.NewForm(
 		huh.NewGroup(
-			huh.NewSelect[string]().Title("Use base branch as").Options(options...).Value(&selected),
+			huh.NewSelect[string]().Title("Use branch as").Options(options...).Value(&selected),
 		),
 	)
 	if err := pickForm.Run(); err != nil {
 		return "", false, err
 	}
-	return selected, selected == rendered, nil
+	return selected, true, nil
 }
 
 // taskEntry is one task directory under a Root's tasksDir, split back into
