@@ -123,7 +123,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if !branchIsExisting {
 		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, branch)
 	}
-	worktreePath := task.WorktreePath(root.TasksDir, taskID, repoName)
+	worktreePath := task.WorktreePath(root.TasksDir, taskID, repoName, renderedBranch)
 
 	if _, err := os.Stat(worktreePath); err == nil {
 		return fmt.Errorf("worktree path already exists: %s", worktreePath)

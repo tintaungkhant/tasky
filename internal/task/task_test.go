@@ -43,9 +43,17 @@ func TestRenderBranch(t *testing.T) {
 }
 
 func TestWorktreePath(t *testing.T) {
-	got := WorktreePath("/Users/dev/Work/company/tasks", "CRO-001-payment", "project-a")
-	want := "/Users/dev/Work/company/tasks/CRO-001-payment/project-a"
+	got := WorktreePath("/Users/dev/Work/company/tasks", "CRO-001-payment", "project-a", "feat/payment-bank-a")
+	want := "/Users/dev/Work/company/tasks/CRO-001-payment/project-a[feat-payment-bank-a]"
 	if got != want {
 		t.Fatalf("WorktreePath() = %q, want %q", got, want)
+	}
+}
+
+func TestWorktreePathDistinctBranchesSameRepo(t *testing.T) {
+	a := WorktreePath("/tasks", "CRO-001", "project-a", "feat/payment-bank-a")
+	b := WorktreePath("/tasks", "CRO-001", "project-a", "feat/payment-bank-b")
+	if a == b {
+		t.Fatalf("WorktreePath() collided for different branches: %q", a)
 	}
 }
