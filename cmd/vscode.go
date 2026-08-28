@@ -104,7 +104,7 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("build workspace file: %w", err)
 	}
 
-	workspacePath := filepath.Join(taskDir, taskID+".code-workspace")
+	workspacePath := filepath.Join(taskDir, task.TaskDirName(entry.ID, entry.Name)+".code-workspace")
 	if err := os.WriteFile(workspacePath, data, 0o644); err != nil {
 		return fmt.Errorf("write workspace file %s: %w", workspacePath, err)
 	}

@@ -91,6 +91,23 @@ func readWorkspace(t *testing.T, path string) vscodeWorkspace {
 	return ws
 }
 
+func TestVSCodeWorkspaceFileNameIncludesTaskName(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	chdir(t, repoPath)
+
+	if err := execAdd(t, "--name", "laravel-upgrade", "CRO-023", "feat/x"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if err := execVSCode(t, "CRO-023"); err != nil {
+		t.Fatalf("vscode: %v", err)
+	}
+
+	workspacePath := filepath.Join(tasksDir, "CRO-023[laravel-upgrade]", "CRO-023[laravel-upgrade].code-workspace")
+	if _, err := os.Stat(workspacePath); err != nil {
+		t.Fatalf("workspace file not created at %s: %v", workspacePath, err)
+	}
+}
+
 func TestVSCodeUnknownTaskErrors(t *testing.T) {
 	_, repoPath, _ := setupRootWithRepo(t)
 	chdir(t, repoPath)
