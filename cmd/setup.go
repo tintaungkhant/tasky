@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tintaungkhant/tasky/internal/config"
+	"github.com/tintaungkhant/tasky/internal/ui"
 )
 
 const (
@@ -55,17 +56,21 @@ func runSetup(cmd *cobra.Command, args []string) error {
 				return err
 			}
 		case actionDone:
-			return cfg.Save()
+			if err := cfg.Save(); err != nil {
+				return err
+			}
+			fmt.Println(ui.Success("Config saved."))
+			return nil
 		}
 	}
 }
 
 func printRoots(cfg *config.Config) {
 	if len(cfg.Roots) == 0 {
-		fmt.Println("No roots configured yet.")
+		fmt.Println(ui.Info("No roots configured yet."))
 		return
 	}
-	fmt.Println("Configured roots:")
+	fmt.Println(ui.Label("Configured roots:"))
 	for _, r := range cfg.Roots {
 		fmt.Printf("  - %s: %s (tasks_dir: %s, branch_template: %s)\n", r.Name, r.Path, r.TasksDir, r.BranchTemplate)
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/tintaungkhant/tasky/internal/config"
 	"github.com/tintaungkhant/tasky/internal/git"
 	"github.com/tintaungkhant/tasky/internal/task"
+	"github.com/tintaungkhant/tasky/internal/ui"
 )
 
 var addFromFlag string
@@ -153,14 +154,14 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		if err := git.WorktreeAddExistingBranch(repoRoot, worktreePath, renderedBranch); err != nil {
 			return err
 		}
-		fmt.Printf("Created worktree at %s (existing branch %s)\n", worktreePath, renderedBranch)
+		fmt.Println(ui.Success("Created worktree at %s (existing branch %s)", worktreePath, renderedBranch))
 		return nil
 	}
 
 	if err := git.WorktreeAddNewBranch(repoRoot, worktreePath, renderedBranch, base); err != nil {
 		return err
 	}
-	fmt.Printf("Created worktree at %s (branch %s, from %s)\n", worktreePath, renderedBranch, base)
+	fmt.Println(ui.Success("Created worktree at %s (branch %s, from %s)", worktreePath, renderedBranch, base))
 	return nil
 }
 
@@ -313,15 +314,15 @@ func promptSelectBase(branches []string, current string) (string, error) {
 }
 
 func confirmCreate(taskID, repoName, base, branch, worktreePath string, reuseExisting bool) (bool, error) {
-	fmt.Println("Task:      ", taskID)
-	fmt.Println("Repository:", repoName)
+	fmt.Println(ui.Label("Task:      "), taskID)
+	fmt.Println(ui.Label("Repository:"), repoName)
 	if reuseExisting {
-		fmt.Println("Branch:    ", branch, "(existing)")
+		fmt.Println(ui.Label("Branch:    "), branch, ui.Info("(existing)"))
 	} else {
-		fmt.Println("Base:      ", base)
-		fmt.Println("Branch:    ", branch)
+		fmt.Println(ui.Label("Base:      "), base)
+		fmt.Println(ui.Label("Branch:    "), branch)
 	}
-	fmt.Println("Worktree:  ", worktreePath)
+	fmt.Println(ui.Label("Worktree:  "), worktreePath)
 
 	confirmed := true
 	form := huh.NewForm(
