@@ -90,6 +90,21 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	base := addFromFlag
+	if base == "" {
+		currentBranch, err := git.CurrentBranch(repoRoot)
+		if err != nil {
+			return err
+		}
+		if interactive {
+			if base, err = promptSelectBase(branches, currentBranch); err != nil {
+				return err
+			}
+		} else {
+			base = currentBranch
+		}
+	}
+
 	var branchIsExisting bool
 	if branch == "" {
 		var isNew bool
@@ -115,21 +130,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	reuseExisting := branchIsExisting || contains(branches, renderedBranch)
-
-	base := addFromFlag
-	if !reuseExisting && base == "" {
-		currentBranch, err := git.CurrentBranch(repoRoot)
-		if err != nil {
-			return err
-		}
-		if interactive {
-			if base, err = promptSelectBase(branches, currentBranch); err != nil {
-				return err
-			}
-		} else {
-			base = currentBranch
-		}
-	}
 
 	if interactive {
 		confirmed, err := confirmCreate(taskID, repoName, base, renderedBranch, worktreePath, reuseExisting)
