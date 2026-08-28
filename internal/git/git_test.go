@@ -94,7 +94,7 @@ func TestWorktreeAddExistingBranch(t *testing.T) {
 	}
 }
 
-func TestCheckedOutBranches(t *testing.T) {
+func TestCheckedOutBranchPaths(t *testing.T) {
 	repo := initRepo(t)
 
 	cmd := exec.Command("git", "branch", "existing-branch")
@@ -108,24 +108,29 @@ func TestCheckedOutBranches(t *testing.T) {
 		t.Fatalf("WorktreeAddExistingBranch: %v", err)
 	}
 
-	checkedOut, err := CheckedOutBranches(repo)
+	paths, err := CheckedOutBranchPaths(repo)
 	if err != nil {
-		t.Fatalf("CheckedOutBranches: %v", err)
+		t.Fatalf("CheckedOutBranchPaths: %v", err)
 	}
-	var hasMain, hasExisting bool
-	for _, b := range checkedOut {
-		if b == "main" {
-			hasMain = true
-		}
-		if b == "existing-branch" {
-			hasExisting = true
-		}
+
+	mainPath, ok := paths["main"]
+	if !ok {
+		t.Fatalf("CheckedOutBranchPaths = %v, want it to include main worktree's branch", paths)
 	}
-	if !hasMain {
-		t.Fatalf("CheckedOutBranches = %v, want it to include main worktree's branch", checkedOut)
+	wantMainPath, _ := filepath.EvalSymlinks(repo)
+	gotMainPath, _ := filepath.EvalSymlinks(mainPath)
+	if gotMainPath != wantMainPath {
+		t.Fatalf("main worktree path = %q, want %q", gotMainPath, wantMainPath)
 	}
-	if !hasExisting {
-		t.Fatalf("CheckedOutBranches = %v, want it to include the new worktree's branch", checkedOut)
+
+	existingPath, ok := paths["existing-branch"]
+	if !ok {
+		t.Fatalf("CheckedOutBranchPaths = %v, want it to include the new worktree's branch", paths)
+	}
+	wantExistingPath, _ := filepath.EvalSymlinks(wtPath)
+	gotExistingPath, _ := filepath.EvalSymlinks(existingPath)
+	if gotExistingPath != wantExistingPath {
+		t.Fatalf("existing-branch worktree path = %q, want %q", gotExistingPath, wantExistingPath)
 	}
 }
 

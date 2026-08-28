@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -69,13 +70,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	checkedOut, err := git.CheckedOutBranches(repoRoot)
+	checkedOut, err := git.CheckedOutBranchPaths(repoRoot)
 	if err != nil {
 		return err
 	}
 	reusableBranches := make([]string, 0, len(branches))
 	for _, b := range branches {
-		if !contains(checkedOut, b) {
+		if _, busy := checkedOut[b]; !busy {
 			reusableBranches = append(reusableBranches, b)
 		}
 	}
@@ -105,8 +106,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	var branchAlreadyRendered bool
 	if branch == "" {
-		if branch, _, err = promptSelectOrNew("Branch", "Branch name", reusableBranches); err != nil {
+		if branch, branchAlreadyRendered, err = promptBranchStep(reusableBranches, taskID, base, root.BranchTemplate); err != nil {
 			return err
 		}
 	}
@@ -119,7 +121,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// A branch that already exists verbatim (typed, selected, or passed as an
 	// arg) is reused as-is; only a genuinely new branch name gets the template.
 	renderedBranch := branch
-	if !contains(branches, branch) {
+	if !branchAlreadyRendered && !contains(branches, branch) {
 		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, branch)
 	}
 	worktreePath := task.WorktreePath(root.TasksDir, taskID, repoName, renderedBranch)
@@ -129,6 +131,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	reuseExisting := contains(branches, renderedBranch)
+
+	if busyPath, busy := checkedOut[renderedBranch]; reuseExisting && busy {
+		if busyPath == repoRoot {
+			return fmt.Errorf("branch %q is checked out in %s's working directory — switch it to another branch first, then retry", renderedBranch, repoName)
+		}
+		return fmt.Errorf("branch %q is already checked out at %s — remove that worktree or pick a different branch", renderedBranch, busyPath)
+	}
 
 	if interactive {
 		confirmed, err := confirmCreate(taskID, repoName, base, renderedBranch, worktreePath, reuseExisting)
@@ -199,6 +208,71 @@ func promptSelectOrNew(selectTitle, inputTitle string, options []string) (value 
 	}
 	v, err := promptText(inputTitle)
 	return v, true, err
+}
+
+// promptBranchStep resolves the worktree's branch interactively. Existing
+// (reusable) branches are offered directly, alongside a "+ New" entry that
+// prompts for free text, pre-filled with base. Leaving that text unchanged
+// or clearing it means "use the base branch", which then asks whether to use
+// base verbatim or with the configured template prefix applied. alreadyRendered
+// reports whether the returned branch is already final and must not be passed
+// through task.RenderBranch again.
+func promptBranchStep(reusable []string, taskID, base, template string) (branch string, alreadyRendered bool, err error) {
+	if len(reusable) > 0 {
+		huhOptions := make([]huh.Option[string], 0, len(reusable)+1)
+		for _, b := range reusable {
+			huhOptions = append(huhOptions, huh.NewOption(b, b))
+		}
+		huhOptions = append(huhOptions, huh.NewOption("+ New", newOptionValue))
+
+		var selected string
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().Title("Branch").Options(huhOptions...).Value(&selected),
+			),
+		)
+		if err := form.Run(); err != nil {
+			return "", false, err
+		}
+		if selected != newOptionValue {
+			return selected, false, nil
+		}
+	}
+
+	var typed string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Title("Branch name").Placeholder(base).Value(&typed),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return "", false, err
+	}
+	typed = strings.TrimSpace(typed)
+
+	if typed != "" {
+		return typed, false, nil
+	}
+
+	rendered := task.RenderBranch(template, taskID, base)
+	if rendered == base {
+		return base, false, nil
+	}
+
+	options := []huh.Option[string]{
+		huh.NewOption(base+" (as-is)", base),
+		huh.NewOption(rendered+" (with prefix)", rendered),
+	}
+	selected := base
+	pickForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Title("Use base branch as").Options(options...).Value(&selected),
+		),
+	)
+	if err := pickForm.Run(); err != nil {
+		return "", false, err
+	}
+	return selected, selected == rendered, nil
 }
 
 // listTaskIDs returns the names of tasksDir's direct subdirectories, i.e.

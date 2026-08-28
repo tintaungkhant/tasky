@@ -62,22 +62,27 @@ func ListLocalBranches(dir string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
-// CheckedOutBranches returns the names of local branches currently checked
-// out in any worktree of the repo at dir (including the main worktree).
-// These cannot be checked out again in a new worktree.
-func CheckedOutBranches(dir string) ([]string, error) {
+// CheckedOutBranchPaths returns, for every local branch currently checked
+// out in some worktree of the repo at dir (including the main worktree
+// itself), the path of the worktree it's checked out in. These branches
+// cannot be checked out again in a new worktree.
+func CheckedOutBranchPaths(dir string) (map[string]string, error) {
 	out, err := run(dir, "worktree", "list", "--porcelain")
 	if err != nil {
 		return nil, err
 	}
-	var branches []string
+	paths := make(map[string]string)
+	var currentPath string
 	for _, line := range strings.Split(out, "\n") {
-		branch, ok := strings.CutPrefix(line, "branch refs/heads/")
-		if ok {
-			branches = append(branches, branch)
+		if path, ok := strings.CutPrefix(line, "worktree "); ok {
+			currentPath = path
+			continue
+		}
+		if branch, ok := strings.CutPrefix(line, "branch refs/heads/"); ok {
+			paths[branch] = currentPath
 		}
 	}
-	return branches, nil
+	return paths, nil
 }
 
 // IsRepo reports whether path is the root of a Git repository (contains a .git entry).

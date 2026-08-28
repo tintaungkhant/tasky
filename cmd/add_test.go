@@ -228,6 +228,19 @@ func TestAddRawBranchMatchingExistingReusedVerbatim(t *testing.T) {
 	}
 }
 
+func TestAddBranchAlreadyCheckedOutElsewhere(t *testing.T) {
+	_, repoPath, _ := setupRootWithRepo(t)
+	chdir(t, repoPath)
+
+	err := execAdd(t, "CRO-011", "main")
+	if err == nil {
+		t.Fatal("expected error: main is already checked out in the primary repo")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("checked out")) {
+		t.Fatalf("error = %q, want it to mention branch already checked out", err.Error())
+	}
+}
+
 func TestAddNoMatchingRoot(t *testing.T) {
 	_, _, _ = setupRootWithRepo(t)
 	outsideDir := t.TempDir()
