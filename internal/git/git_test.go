@@ -94,6 +94,41 @@ func TestWorktreeAddExistingBranch(t *testing.T) {
 	}
 }
 
+func TestCheckedOutBranches(t *testing.T) {
+	repo := initRepo(t)
+
+	cmd := exec.Command("git", "branch", "existing-branch")
+	cmd.Dir = repo
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git branch: %v\n%s", err, out)
+	}
+
+	wtPath := filepath.Join(t.TempDir(), "wt")
+	if err := WorktreeAddExistingBranch(repo, wtPath, "existing-branch"); err != nil {
+		t.Fatalf("WorktreeAddExistingBranch: %v", err)
+	}
+
+	checkedOut, err := CheckedOutBranches(repo)
+	if err != nil {
+		t.Fatalf("CheckedOutBranches: %v", err)
+	}
+	var hasMain, hasExisting bool
+	for _, b := range checkedOut {
+		if b == "main" {
+			hasMain = true
+		}
+		if b == "existing-branch" {
+			hasExisting = true
+		}
+	}
+	if !hasMain {
+		t.Fatalf("CheckedOutBranches = %v, want it to include main worktree's branch", checkedOut)
+	}
+	if !hasExisting {
+		t.Fatalf("CheckedOutBranches = %v, want it to include the new worktree's branch", checkedOut)
+	}
+}
+
 func TestWorktreeAddNewBranchErrorWrapped(t *testing.T) {
 	repo := initRepo(t)
 	err := WorktreeAddNewBranch(repo, t.TempDir(), "feat/payment", "does-not-exist")

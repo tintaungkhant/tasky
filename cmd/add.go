@@ -69,6 +69,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	checkedOut, err := git.CheckedOutBranches(repoRoot)
+	if err != nil {
+		return err
+	}
+	reusableBranches := make([]string, 0, len(branches))
+	for _, b := range branches {
+		if !contains(checkedOut, b) {
+			reusableBranches = append(reusableBranches, b)
+		}
+	}
+
 	if taskID == "" {
 		ids, err := listTaskIDs(root.TasksDir)
 		if err != nil {
@@ -82,7 +93,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	var branchIsExisting bool
 	if branch == "" {
 		var isNew bool
-		if branch, isNew, err = promptSelectOrNew("Branch", "Branch name", branches); err != nil {
+		if branch, isNew, err = promptSelectOrNew("Branch", "Branch name", reusableBranches); err != nil {
 			return err
 		}
 		branchIsExisting = !isNew
