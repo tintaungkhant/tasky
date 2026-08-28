@@ -213,6 +213,21 @@ func TestAddSameTaskAndRepoDifferentBranches(t *testing.T) {
 	}
 }
 
+func TestAddRawBranchMatchingExistingReusedVerbatim(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	runGit(t, repoPath, "branch", "feat/payment")
+	chdir(t, repoPath)
+
+	if err := execAdd(t, "CRO-002", "feat/payment"); err != nil {
+		t.Fatalf("tasky add: %v", err)
+	}
+
+	wantWorktree := filepath.Join(tasksDir, "CRO-002", "project-a[feat-payment]")
+	if got := currentBranch(t, wantWorktree); got != "feat/payment" {
+		t.Fatalf("worktree branch = %q, want feat/payment (reused verbatim, not templated)", got)
+	}
+}
+
 func TestAddNoMatchingRoot(t *testing.T) {
 	_, _, _ = setupRootWithRepo(t)
 	outsideDir := t.TempDir()

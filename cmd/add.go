@@ -105,13 +105,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var branchIsExisting bool
 	if branch == "" {
-		var isNew bool
-		if branch, isNew, err = promptSelectOrNew("Branch", "Branch name", reusableBranches); err != nil {
+		if branch, _, err = promptSelectOrNew("Branch", "Branch name", reusableBranches); err != nil {
 			return err
 		}
-		branchIsExisting = !isNew
 	}
 
 	if err := os.MkdirAll(root.TasksDir, 0o755); err != nil {
@@ -119,8 +116,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	repoName := filepath.Base(repoRoot)
+	// A branch that already exists verbatim (typed, selected, or passed as an
+	// arg) is reused as-is; only a genuinely new branch name gets the template.
 	renderedBranch := branch
-	if !branchIsExisting {
+	if !contains(branches, branch) {
 		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, branch)
 	}
 	worktreePath := task.WorktreePath(root.TasksDir, taskID, repoName, renderedBranch)
@@ -129,7 +128,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("worktree path already exists: %s", worktreePath)
 	}
 
-	reuseExisting := branchIsExisting || contains(branches, renderedBranch)
+	reuseExisting := contains(branches, renderedBranch)
 
 	if interactive {
 		confirmed, err := confirmCreate(taskID, repoName, base, renderedBranch, worktreePath, reuseExisting)
