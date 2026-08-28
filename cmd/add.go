@@ -64,15 +64,28 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	branches, err := git.ListLocalBranches(repoRoot)
+	if err != nil {
+		return err
+	}
+
 	if taskID == "" {
-		if taskID, err = promptText("Task ID"); err != nil {
+		ids, err := listTaskIDs(root.TasksDir)
+		if err != nil {
+			return err
+		}
+		if taskID, _, err = promptSelectOrNew("Task ID", "Task ID", ids); err != nil {
 			return err
 		}
 	}
+
+	var branchIsExisting bool
 	if branch == "" {
-		if branch, err = promptText("Branch name"); err != nil {
+		var isNew bool
+		if branch, isNew, err = promptSelectOrNew("Branch", "Branch name", branches); err != nil {
 			return err
 		}
+		branchIsExisting = !isNew
 	}
 
 	if err := os.MkdirAll(root.TasksDir, 0o755); err != nil {
@@ -80,18 +93,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	repoName := filepath.Base(repoRoot)
-	renderedBranch := task.RenderBranch(root.BranchTemplate, taskID, branch)
+	renderedBranch := branch
+	if !branchIsExisting {
+		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, branch)
+	}
 	worktreePath := task.WorktreePath(root.TasksDir, taskID, repoName)
 
 	if _, err := os.Stat(worktreePath); err == nil {
 		return fmt.Errorf("worktree path already exists: %s", worktreePath)
 	}
 
-	branches, err := git.ListLocalBranches(repoRoot)
-	if err != nil {
-		return err
-	}
-	reuseExisting := contains(branches, renderedBranch)
+	reuseExisting := branchIsExisting || contains(branches, renderedBranch)
 
 	base := addFromFlag
 	if !reuseExisting && base == "" {
@@ -144,6 +156,59 @@ func promptText(title string) (string, error) {
 		return "", err
 	}
 	return value, nil
+}
+
+const newOptionValue = "\x00new"
+
+// promptSelectOrNew offers existing options plus a "+ New" entry that falls
+// through to a free-text prompt. isNew reports whether the returned value
+// came from that free-text prompt rather than being picked from options.
+func promptSelectOrNew(selectTitle, inputTitle string, options []string) (value string, isNew bool, err error) {
+	if len(options) == 0 {
+		v, err := promptText(inputTitle)
+		return v, true, err
+	}
+
+	huhOptions := make([]huh.Option[string], 0, len(options)+1)
+	for _, o := range options {
+		huhOptions = append(huhOptions, huh.NewOption(o, o))
+	}
+	huhOptions = append(huhOptions, huh.NewOption("+ New", newOptionValue))
+
+	var selected string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Title(selectTitle).Options(huhOptions...).Value(&selected),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return "", false, err
+	}
+	if selected != newOptionValue {
+		return selected, false, nil
+	}
+	v, err := promptText(inputTitle)
+	return v, true, err
+}
+
+// listTaskIDs returns the names of tasksDir's direct subdirectories, i.e.
+// task IDs already in use by any repo under the same Root.
+func listTaskIDs(tasksDir string) ([]string, error) {
+	entries, err := os.ReadDir(tasksDir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read tasks directory %s: %w", tasksDir, err)
+	}
+	var ids []string
+	for _, e := range entries {
+		if e.IsDir() {
+			ids = append(ids, e.Name())
+		}
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func promptSelectBase(branches []string, current string) (string, error) {

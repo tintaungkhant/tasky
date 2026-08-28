@@ -258,6 +258,36 @@ func TestAddGitFailureWrapped(t *testing.T) {
 	}
 }
 
+func TestListTaskIDs(t *testing.T) {
+	tasksDir := t.TempDir()
+
+	ids, err := listTaskIDs(filepath.Join(tasksDir, "does-not-exist"))
+	if err != nil {
+		t.Fatalf("listTaskIDs on missing dir: %v", err)
+	}
+	if len(ids) != 0 {
+		t.Fatalf("listTaskIDs on missing dir = %v, want empty", ids)
+	}
+
+	for _, id := range []string{"CRO-002", "CRO-001"} {
+		if err := os.MkdirAll(filepath.Join(tasksDir, id), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(tasksDir, "not-a-dir"), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err = listTaskIDs(tasksDir)
+	if err != nil {
+		t.Fatalf("listTaskIDs: %v", err)
+	}
+	want := []string{"CRO-001", "CRO-002"}
+	if len(ids) != len(want) || ids[0] != want[0] || ids[1] != want[1] {
+		t.Fatalf("listTaskIDs = %v, want %v", ids, want)
+	}
+}
+
 func TestAddExistingBranchReuse(t *testing.T) {
 	_, repoPath, tasksDir := setupRootWithRepo(t)
 	renderedBranch := "task/CRO-005-existing/feat/x"
