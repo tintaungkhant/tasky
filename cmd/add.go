@@ -17,6 +17,7 @@ import (
 )
 
 var addFromFlag string
+var addNameFlag string
 
 var addCmd = &cobra.Command{
 	Use:   "add [repo] <task-id> <branch>",
@@ -38,6 +39,7 @@ func addArgsValidator(cmd *cobra.Command, args []string) error {
 
 func init() {
 	addCmd.Flags().StringVar(&addFromFlag, "from", "", "base branch to create the new branch from (default: current branch)")
+	addCmd.Flags().StringVar(&addNameFlag, "name", "", "optional human-readable task name (ignored if the task ID already exists)")
 	rootCmd.AddCommand(addCmd)
 }
 
@@ -82,15 +84,29 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	taskEntries, err := listTaskEntries(root.TasksDir)
+	if err != nil {
+		return err
+	}
+
 	if taskID == "" {
-		ids, err := listTaskIDs(root.TasksDir)
-		if err != nil {
-			return err
-		}
-		if taskID, _, err = promptSelectOrNew("Task ID", "Task ID", ids); err != nil {
+		if taskID, _, err = promptSelectOrNewTaskID(taskEntries); err != nil {
 			return err
 		}
 	}
+
+	var taskName string
+	if existing, found := findTaskEntry(taskEntries, taskID); found {
+		taskName = existing.Name
+	} else {
+		taskName = addNameFlag
+		if taskName == "" && interactive {
+			if taskName, err = promptOptionalText("Task name (optional)"); err != nil {
+				return err
+			}
+		}
+	}
+	taskDirName := task.TaskDirName(taskID, taskName)
 
 	base := addFromFlag
 	if base == "" {
@@ -109,7 +125,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	var branchAlreadyRendered bool
 	if branch == "" {
-		if branch, branchAlreadyRendered, err = promptBranchStep(reusableBranches, taskID, base, root.BranchTemplate); err != nil {
+		if branch, branchAlreadyRendered, err = promptBranchStep(reusableBranches, taskID, taskName, base, root.BranchTemplate); err != nil {
 			return err
 		}
 	}
@@ -123,9 +139,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// arg) is reused as-is; only a genuinely new branch name gets the template.
 	renderedBranch := branch
 	if !branchAlreadyRendered && !contains(branches, branch) {
-		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, branch)
+		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, taskName, branch)
 	}
-	worktreePath := task.WorktreePath(root.TasksDir, taskID, repoName, renderedBranch)
+	worktreePath := task.WorktreePath(root.TasksDir, taskDirName, repoName, renderedBranch)
 
 	if _, err := os.Stat(worktreePath); err == nil {
 		return fmt.Errorf("worktree path already exists: %s", worktreePath)
@@ -141,7 +157,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if interactive {
-		confirmed, err := confirmCreate(taskID, repoName, base, renderedBranch, worktreePath, reuseExisting)
+		confirmed, err := confirmCreate(taskID, taskName, repoName, base, renderedBranch, worktreePath, reuseExisting)
 		if err != nil {
 			return err
 		}
@@ -218,7 +234,7 @@ func promptSelectOrNew(selectTitle, inputTitle string, options []string) (value 
 // base verbatim or with the configured template prefix applied. alreadyRendered
 // reports whether the returned branch is already final and must not be passed
 // through task.RenderBranch again.
-func promptBranchStep(reusable []string, taskID, base, template string) (branch string, alreadyRendered bool, err error) {
+func promptBranchStep(reusable []string, taskID, taskName, base, template string) (branch string, alreadyRendered bool, err error) {
 	if len(reusable) > 0 {
 		huhOptions := make([]huh.Option[string], 0, len(reusable)+1)
 		for _, b := range reusable {
@@ -255,7 +271,7 @@ func promptBranchStep(reusable []string, taskID, base, template string) (branch 
 		return typed, false, nil
 	}
 
-	rendered := task.RenderBranch(template, taskID, base)
+	rendered := task.RenderBranch(template, taskID, taskName, base)
 	if rendered == base {
 		return base, false, nil
 	}
@@ -276,9 +292,16 @@ func promptBranchStep(reusable []string, taskID, base, template string) (branch 
 	return selected, selected == rendered, nil
 }
 
-// listTaskIDs returns the names of tasksDir's direct subdirectories, i.e.
-// task IDs already in use by any repo under the same Root.
-func listTaskIDs(tasksDir string) ([]string, error) {
+// taskEntry is one task directory under a Root's tasksDir, split back into
+// its ID and optional human-readable name (see task.ParseTaskDirName).
+type taskEntry struct {
+	ID   string
+	Name string
+}
+
+// listTaskEntries returns every task directory under tasksDir, parsed into
+// (ID, Name) pairs. Task IDs already in use by any repo under the same Root.
+func listTaskEntries(tasksDir string) ([]taskEntry, error) {
 	entries, err := os.ReadDir(tasksDir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -286,14 +309,75 @@ func listTaskIDs(tasksDir string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read tasks directory %s: %w", tasksDir, err)
 	}
-	var ids []string
+	var out []taskEntry
 	for _, e := range entries {
-		if e.IsDir() {
-			ids = append(ids, e.Name())
+		if !e.IsDir() {
+			continue
+		}
+		id, name := task.ParseTaskDirName(e.Name())
+		out = append(out, taskEntry{ID: id, Name: name})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+// findTaskEntry looks up a task by ID among entries (see listTaskEntries).
+func findTaskEntry(entries []taskEntry, id string) (taskEntry, bool) {
+	for _, e := range entries {
+		if e.ID == id {
+			return e, true
 		}
 	}
-	sort.Strings(ids)
-	return ids, nil
+	return taskEntry{}, false
+}
+
+// promptSelectOrNewTaskID offers existing task IDs (labeled with their name,
+// if any) plus a "+ New" entry that falls through to a free-text prompt.
+func promptSelectOrNewTaskID(entries []taskEntry) (value string, isNew bool, err error) {
+	if len(entries) == 0 {
+		v, err := promptText("Task ID")
+		return v, true, err
+	}
+
+	huhOptions := make([]huh.Option[string], 0, len(entries)+1)
+	for _, e := range entries {
+		label := e.ID
+		if e.Name != "" {
+			label = fmt.Sprintf("%s (%s)", e.ID, e.Name)
+		}
+		huhOptions = append(huhOptions, huh.NewOption(label, e.ID))
+	}
+	huhOptions = append(huhOptions, huh.NewOption("+ New", newOptionValue))
+
+	var selected string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().Title("Task ID").Options(huhOptions...).Value(&selected),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return "", false, err
+	}
+	if selected != newOptionValue {
+		return selected, false, nil
+	}
+	v, err := promptText("Task ID")
+	return v, true, err
+}
+
+// promptOptionalText prompts for free text with no non-empty validation,
+// trimming whitespace. An empty result is a valid answer ("skip").
+func promptOptionalText(title string) (string, error) {
+	var value string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().Title(title).Value(&value),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(value), nil
 }
 
 func promptSelectBase(branches []string, current string) (string, error) {
@@ -313,8 +397,11 @@ func promptSelectBase(branches []string, current string) (string, error) {
 	return base, nil
 }
 
-func confirmCreate(taskID, repoName, base, branch, worktreePath string, reuseExisting bool) (bool, error) {
+func confirmCreate(taskID, taskName, repoName, base, branch, worktreePath string, reuseExisting bool) (bool, error) {
 	fmt.Println(ui.Label("Task:      "), taskID)
+	if taskName != "" {
+		fmt.Println(ui.Label("Name:      "), taskName)
+	}
 	fmt.Println(ui.Label("Repository:"), repoName)
 	if reuseExisting {
 		fmt.Println(ui.Label("Branch:    "), branch, ui.Info("(existing)"))

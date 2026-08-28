@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tintaungkhant/tasky/internal/config"
+	"github.com/tintaungkhant/tasky/internal/task"
 	"github.com/tintaungkhant/tasky/internal/ui"
 )
 
@@ -53,29 +54,32 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	taskEntries, err := listTaskEntries(root.TasksDir)
+	if err != nil {
+		return err
+	}
+
 	taskID := ""
 	if len(args) == 1 {
 		taskID = args[0]
 	}
 	if taskID == "" {
-		ids, err := listTaskIDs(root.TasksDir)
-		if err != nil {
-			return err
-		}
-		if len(ids) == 0 {
+		if len(taskEntries) == 0 {
 			return fmt.Errorf("no tasks found under %s", root.TasksDir)
 		}
-		if taskID, err = promptSelectTaskID(ids); err != nil {
+		if taskID, err = promptSelectTaskID(taskEntries); err != nil {
 			return err
 		}
 	}
 
-	taskDir := filepath.Join(root.TasksDir, taskID)
+	entry, found := findTaskEntry(taskEntries, taskID)
+	if !found {
+		return fmt.Errorf("task %q not found under %s", taskID, root.TasksDir)
+	}
+
+	taskDir := filepath.Join(root.TasksDir, task.TaskDirName(entry.ID, entry.Name))
 	entries, err := os.ReadDir(taskDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("task %q not found under %s", taskID, root.TasksDir)
-		}
 		return fmt.Errorf("read task directory %s: %w", taskDir, err)
 	}
 
@@ -109,10 +113,14 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func promptSelectTaskID(ids []string) (string, error) {
-	options := make([]huh.Option[string], 0, len(ids))
-	for _, id := range ids {
-		options = append(options, huh.NewOption(id, id))
+func promptSelectTaskID(entries []taskEntry) (string, error) {
+	options := make([]huh.Option[string], 0, len(entries))
+	for _, e := range entries {
+		label := e.ID
+		if e.Name != "" {
+			label = fmt.Sprintf("%s (%s)", e.ID, e.Name)
+		}
+		options = append(options, huh.NewOption(label, e.ID))
 	}
 	var taskID string
 	form := huh.NewForm(

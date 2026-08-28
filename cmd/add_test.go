@@ -78,6 +78,7 @@ func chdir(t *testing.T, dir string) {
 func execAdd(t *testing.T, args ...string) error {
 	t.Helper()
 	addFromFlag = ""
+	addNameFlag = ""
 	var out bytes.Buffer
 	rootCmd.SetOut(&out)
 	rootCmd.SetArgs(append([]string{"add"}, args...))
@@ -213,6 +214,46 @@ func TestAddSameTaskAndRepoDifferentBranches(t *testing.T) {
 	}
 }
 
+func TestAddWithNameFlagCreatesBracketedTaskFolder(t *testing.T) {
+	_, repoPath, tasksDir := setupRootWithRepo(t)
+	chdir(t, repoPath)
+
+	if err := execAdd(t, "--name", "laravel-upgrade", "CRO-030", "feat/x"); err != nil {
+		t.Fatalf("tasky add: %v", err)
+	}
+
+	wantWorktree := filepath.Join(tasksDir, "CRO-030[laravel-upgrade]", "project-a[task-CRO-030-feat-x]")
+	if _, err := os.Stat(filepath.Join(wantWorktree, "README.md")); err != nil {
+		t.Fatalf("worktree not created at %s: %v", wantWorktree, err)
+	}
+}
+
+func TestAddReuseExistingTaskIDKeepsName(t *testing.T) {
+	root, repoPath, tasksDir := setupRootWithRepo(t)
+	chdir(t, repoPath)
+
+	repoBPath := filepath.Join(root, "project-b")
+	initTestRepo(t, repoBPath)
+
+	if err := execAdd(t, "--name", "laravel-upgrade", "project-a", "CRO-031", "feat/x"); err != nil {
+		t.Fatalf("tasky add (project-a): %v", err)
+	}
+
+	// Second repo added to the same task ID, with a different --name: the
+	// name already on disk wins, the new one is ignored.
+	if err := execAdd(t, "--name", "should-be-ignored", "project-b", "CRO-031", "feat/y"); err != nil {
+		t.Fatalf("tasky add (project-b): %v", err)
+	}
+
+	taskDir := filepath.Join(tasksDir, "CRO-031[laravel-upgrade]")
+	if _, err := os.Stat(filepath.Join(taskDir, "project-b[task-CRO-031-feat-y]", "README.md")); err != nil {
+		t.Fatalf("project-b worktree not created under %s: %v", taskDir, err)
+	}
+	if _, err := os.Stat(filepath.Join(tasksDir, "CRO-031[should-be-ignored]")); err == nil {
+		t.Fatalf("a second task folder was created for the ignored --name")
+	}
+}
+
 func TestAddRawBranchMatchingExistingReusedVerbatim(t *testing.T) {
 	_, repoPath, tasksDir := setupRootWithRepo(t)
 	runGit(t, repoPath, "branch", "feat/payment")
@@ -307,19 +348,19 @@ func TestAddGitFailureWrapped(t *testing.T) {
 	}
 }
 
-func TestListTaskIDs(t *testing.T) {
+func TestListTaskEntries(t *testing.T) {
 	tasksDir := t.TempDir()
 
-	ids, err := listTaskIDs(filepath.Join(tasksDir, "does-not-exist"))
+	entries, err := listTaskEntries(filepath.Join(tasksDir, "does-not-exist"))
 	if err != nil {
-		t.Fatalf("listTaskIDs on missing dir: %v", err)
+		t.Fatalf("listTaskEntries on missing dir: %v", err)
 	}
-	if len(ids) != 0 {
-		t.Fatalf("listTaskIDs on missing dir = %v, want empty", ids)
+	if len(entries) != 0 {
+		t.Fatalf("listTaskEntries on missing dir = %v, want empty", entries)
 	}
 
-	for _, id := range []string{"CRO-002", "CRO-001"} {
-		if err := os.MkdirAll(filepath.Join(tasksDir, id), 0o755); err != nil {
+	for _, dir := range []string{"CRO-002", "CRO-001[laravel-upgrade]"} {
+		if err := os.MkdirAll(filepath.Join(tasksDir, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -327,13 +368,13 @@ func TestListTaskIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ids, err = listTaskIDs(tasksDir)
+	entries, err = listTaskEntries(tasksDir)
 	if err != nil {
-		t.Fatalf("listTaskIDs: %v", err)
+		t.Fatalf("listTaskEntries: %v", err)
 	}
-	want := []string{"CRO-001", "CRO-002"}
-	if len(ids) != len(want) || ids[0] != want[0] || ids[1] != want[1] {
-		t.Fatalf("listTaskIDs = %v, want %v", ids, want)
+	want := []taskEntry{{ID: "CRO-001", Name: "laravel-upgrade"}, {ID: "CRO-002", Name: ""}}
+	if len(entries) != len(want) || entries[0] != want[0] || entries[1] != want[1] {
+		t.Fatalf("listTaskEntries = %v, want %v", entries, want)
 	}
 }
 
