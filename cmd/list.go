@@ -1,0 +1,86 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
+
+	"github.com/tintaungkhant/tasky/internal/config"
+	"github.com/tintaungkhant/tasky/internal/git"
+	"github.com/tintaungkhant/tasky/internal/task"
+	"github.com/tintaungkhant/tasky/internal/ui"
+)
+
+var listCmd = &cobra.Command{
+	Use:   "list [task-id]",
+	Short: "List tasks and their worktrees",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runList,
+}
+
+func init() {
+	rootCmd.AddCommand(listCmd)
+}
+
+func runList(cmd *cobra.Command, args []string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	root, err := cfg.MatchRoot(cwd)
+	if err != nil {
+		return err
+	}
+
+	taskEntries, err := task.ListEntries(root.TasksDir)
+	if err != nil {
+		return err
+	}
+
+	if len(args) == 1 {
+		taskID := args[0]
+		entry, found := task.FindEntry(taskEntries, taskID)
+		if !found {
+			return fmt.Errorf("task %q not found under %s", taskID, root.TasksDir)
+		}
+		taskEntries = []task.Entry{entry}
+	}
+
+	out := cmd.OutOrStdout()
+	if len(taskEntries) == 0 {
+		fmt.Fprintf(out, "no tasks found under %s\n", root.TasksDir)
+		return nil
+	}
+
+	for i, entry := range taskEntries {
+		if i > 0 {
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintln(out, ui.Label(entry.Label()))
+
+		worktrees, err := task.ListWorktrees(root.TasksDir, task.TaskDirName(entry.ID, entry.Name))
+		if err != nil {
+			return err
+		}
+		if len(worktrees) == 0 {
+			fmt.Fprintln(out, "  (no worktrees)")
+			continue
+		}
+		for _, wt := range worktrees {
+			branch, err := git.CurrentBranch(wt.Path)
+			if err != nil {
+				fmt.Fprintf(out, "  %s  %s\n", wt.RepoName, wt.Path)
+				continue
+			}
+			fmt.Fprintf(out, "  %s  %s  %s\n", wt.RepoName, branch, wt.Path)
+		}
+	}
+	return nil
+}
