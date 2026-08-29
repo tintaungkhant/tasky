@@ -50,6 +50,29 @@ func WorktreeAddExistingBranch(repoDir, path, branch string) error {
 	return err
 }
 
+// WorktreeRemove removes the worktree at path. It refuses when the worktree
+// has uncommitted changes or is locked unless force is set.
+func WorktreeRemove(repoDir, path string, force bool) error {
+	args := []string{"worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	args = append(args, path)
+	_, err := run(repoDir, args...)
+	return err
+}
+
+// DeleteBranch deletes branch from the repo at dir. It refuses to delete a
+// branch with commits not merged elsewhere unless force is set.
+func DeleteBranch(dir, branch string, force bool) error {
+	flag := "-d"
+	if force {
+		flag = "-D"
+	}
+	_, err := run(dir, "branch", flag, branch)
+	return err
+}
+
 // ListLocalBranches returns the names of all local branches in the repo at dir.
 func ListLocalBranches(dir string) ([]string, error) {
 	out, err := run(dir, "for-each-ref", "--format=%(refname:short)", "refs/heads/")

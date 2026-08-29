@@ -167,6 +167,96 @@ func TestListLocalBranches(t *testing.T) {
 	}
 }
 
+func TestWorktreeRemove(t *testing.T) {
+	repo := initRepo(t)
+	wtPath := filepath.Join(t.TempDir(), "wt")
+	if err := WorktreeAddNewBranch(repo, wtPath, "feat/payment", "main"); err != nil {
+		t.Fatalf("WorktreeAddNewBranch: %v", err)
+	}
+
+	if err := WorktreeRemove(repo, wtPath, false); err != nil {
+		t.Fatalf("WorktreeRemove: %v", err)
+	}
+	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
+		t.Fatalf("worktree still present at %s after remove", wtPath)
+	}
+}
+
+func TestWorktreeRemoveDirtyRequiresForce(t *testing.T) {
+	repo := initRepo(t)
+	wtPath := filepath.Join(t.TempDir(), "wt")
+	if err := WorktreeAddNewBranch(repo, wtPath, "feat/payment", "main"); err != nil {
+		t.Fatalf("WorktreeAddNewBranch: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(wtPath, "dirty.txt"), []byte("uncommitted"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WorktreeRemove(repo, wtPath, false); err == nil {
+		t.Fatal("expected error removing dirty worktree without force")
+	}
+	if _, err := os.Stat(wtPath); err != nil {
+		t.Fatalf("worktree should still exist after refused remove: %v", err)
+	}
+
+	if err := WorktreeRemove(repo, wtPath, true); err != nil {
+		t.Fatalf("WorktreeRemove with force: %v", err)
+	}
+	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
+		t.Fatalf("worktree still present at %s after forced remove", wtPath)
+	}
+}
+
+func TestDeleteBranch(t *testing.T) {
+	repo := initRepo(t)
+	cmd := exec.Command("git", "branch", "feat/payment")
+	cmd.Dir = repo
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git branch: %v\n%s", err, out)
+	}
+
+	if err := DeleteBranch(repo, "feat/payment", false); err != nil {
+		t.Fatalf("DeleteBranch: %v", err)
+	}
+
+	branches, err := ListLocalBranches(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range branches {
+		if b == "feat/payment" {
+			t.Fatal("branch still present after DeleteBranch")
+		}
+	}
+}
+
+func TestDeleteBranchUnmergedRequiresForce(t *testing.T) {
+	repo := initRepo(t)
+	cmd := exec.Command("git", "checkout", "-b", "feat/payment")
+	cmd.Dir = repo
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git checkout: %v\n%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "unmerged.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", "unmerged.txt"}, {"commit", "-m", "unmerged"}, {"checkout", "main"}} {
+		c := exec.Command("git", args...)
+		c.Dir = repo
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	if err := DeleteBranch(repo, "feat/payment", false); err == nil {
+		t.Fatal("expected error deleting unmerged branch without force")
+	}
+
+	if err := DeleteBranch(repo, "feat/payment", true); err != nil {
+		t.Fatalf("DeleteBranch with force: %v", err)
+	}
+}
+
 func TestIsRepo(t *testing.T) {
 	repo := initRepo(t)
 	if !IsRepo(repo) {

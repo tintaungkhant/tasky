@@ -134,6 +134,57 @@ func TestListEntries(t *testing.T) {
 	}
 }
 
+func TestParseWorktreeDirName(t *testing.T) {
+	tests := []struct {
+		dirName       string
+		wantRepoName  string
+		wantSanitized string
+	}{
+		{"project-a[feat-payment]", "project-a", "feat-payment"},
+		{"project-a[task-CRO-001-feat-payment]", "project-a", "task-CRO-001-feat-payment"},
+	}
+	for _, tt := range tests {
+		repoName, sanitized := ParseWorktreeDirName(tt.dirName)
+		if repoName != tt.wantRepoName || sanitized != tt.wantSanitized {
+			t.Fatalf("ParseWorktreeDirName(%q) = (%q, %q), want (%q, %q)", tt.dirName, repoName, sanitized, tt.wantRepoName, tt.wantSanitized)
+		}
+	}
+}
+
+func TestListWorktrees(t *testing.T) {
+	tasksDir := t.TempDir()
+
+	worktrees, err := ListWorktrees(tasksDir, "does-not-exist")
+	if err != nil {
+		t.Fatalf("ListWorktrees on missing task dir: %v", err)
+	}
+	if len(worktrees) != 0 {
+		t.Fatalf("ListWorktrees on missing task dir = %v, want empty", worktrees)
+	}
+
+	taskDir := filepath.Join(tasksDir, "CRO-001")
+	for _, dir := range []string{"project-a[feat-a]", "project-b[feat-b]"} {
+		if err := os.MkdirAll(filepath.Join(taskDir, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(taskDir, "not-a-dir"), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	worktrees, err = ListWorktrees(tasksDir, "CRO-001")
+	if err != nil {
+		t.Fatalf("ListWorktrees: %v", err)
+	}
+	want := []WorktreeEntry{
+		{RepoName: "project-a", Path: filepath.Join(taskDir, "project-a[feat-a]")},
+		{RepoName: "project-b", Path: filepath.Join(taskDir, "project-b[feat-b]")},
+	}
+	if len(worktrees) != len(want) || worktrees[0] != want[0] || worktrees[1] != want[1] {
+		t.Fatalf("ListWorktrees = %v, want %v", worktrees, want)
+	}
+}
+
 func TestFindEntry(t *testing.T) {
 	entries := []Entry{{ID: "CRO-001", Name: "laravel-upgrade"}, {ID: "CRO-002"}}
 	if got, ok := FindEntry(entries, "CRO-002"); !ok || got.Name != "" {

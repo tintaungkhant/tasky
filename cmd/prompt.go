@@ -44,7 +44,12 @@ func promptOptionalText(title string) (string, error) {
 
 // promptConfirm asks a yes/no question, defaulting to true.
 func promptConfirm(title string) (bool, error) {
-	confirmed := true
+	return promptConfirmDefault(title, true)
+}
+
+// promptConfirmDefault asks a yes/no question, preselecting def.
+func promptConfirmDefault(title string, def bool) (bool, error) {
+	confirmed := def
 	if err := runForm(huh.NewConfirm().Title(title).Value(&confirmed)); err != nil {
 		return false, err
 	}

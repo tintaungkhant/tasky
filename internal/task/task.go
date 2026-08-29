@@ -89,6 +89,53 @@ func ListEntries(tasksDir string) ([]Entry, error) {
 	return out, nil
 }
 
+// ParseWorktreeDirName splits a worktree directory's name (as produced by
+// WorktreePath) into its repo name and sanitized branch (slashes folded to
+// dashes, so not reversible back to the real branch name — callers needing
+// the real branch should read it from the worktree itself).
+func ParseWorktreeDirName(dirName string) (repoName, sanitizedBranch string) {
+	if strings.HasSuffix(dirName, "]") {
+		if i := strings.Index(dirName, "["); i != -1 {
+			return dirName[:i], dirName[i+1 : len(dirName)-1]
+		}
+	}
+	return dirName, ""
+}
+
+// WorktreeEntry is one repo worktree directory under a task directory.
+type WorktreeEntry struct {
+	RepoName string
+	Path     string
+}
+
+// ListWorktrees returns every worktree directory under tasksDir/taskDirName,
+// sorted by repo name then path. A missing task directory yields no entries.
+func ListWorktrees(tasksDir, taskDirName string) ([]WorktreeEntry, error) {
+	taskDir := filepath.Join(tasksDir, taskDirName)
+	entries, err := os.ReadDir(taskDir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read task directory %s: %w", taskDir, err)
+	}
+	var out []WorktreeEntry
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		repoName, _ := ParseWorktreeDirName(e.Name())
+		out = append(out, WorktreeEntry{RepoName: repoName, Path: filepath.Join(taskDir, e.Name())})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].RepoName != out[j].RepoName {
+			return out[i].RepoName < out[j].RepoName
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out, nil
+}
+
 // FindEntry looks up a task by ID among entries (see ListEntries).
 func FindEntry(entries []Entry, id string) (Entry, bool) {
 	for _, e := range entries {
