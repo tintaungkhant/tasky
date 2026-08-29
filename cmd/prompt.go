@@ -79,6 +79,18 @@ func selectOne(title string, options []huh.Option[string]) (string, error) {
 	return selectOneDefault(title, options, "")
 }
 
+// selectOneFiltering prompts to pick one of options, starting in filter mode
+// with a taller list than selectOne's default — for pickers over lists that
+// may grow large (e.g. many tasks), where typing to search beats arrowing
+// through everything.
+func selectOneFiltering(title string, options []huh.Option[string]) (string, error) {
+	var value string
+	if err := runForm(huh.NewSelect[string]().Title(title).Options(options...).Filtering(true).Height(15).Value(&value)); err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
 // selectWithNew offers options plus a "+ New" entry that falls through to a
 // free-text prompt at inputTitle. With no options, it prompts for free text
 // directly.

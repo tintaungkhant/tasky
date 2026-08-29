@@ -8,6 +8,7 @@ import (
 
 func execList(t *testing.T, args ...string) (string, error) {
 	t.Helper()
+	listAllFlag = false
 	var out bytes.Buffer
 	rootCmd.SetOut(&out)
 	rootCmd.SetArgs(append([]string{"list"}, args...))
@@ -15,7 +16,7 @@ func execList(t *testing.T, args ...string) (string, error) {
 	return out.String(), err
 }
 
-func TestListShowsAllTasksWithWorktrees(t *testing.T) {
+func TestListAllShowsAllTasksWithWorktrees(t *testing.T) {
 	root, repoPath, _ := setupRootWithRepo(t)
 	chdir(t, repoPath)
 
@@ -29,9 +30,9 @@ func TestListShowsAllTasksWithWorktrees(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	out, err := execList(t)
+	out, err := execList(t, "--all")
 	if err != nil {
-		t.Fatalf("tasky list: %v", err)
+		t.Fatalf("tasky list --all: %v", err)
 	}
 
 	for _, want := range []string{

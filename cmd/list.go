@@ -12,6 +12,8 @@ import (
 	"github.com/tintaungkhant/tasky/internal/ui"
 )
 
+var listAllFlag bool
+
 var listCmd = &cobra.Command{
 	Use:   "list [task-id]",
 	Short: "List tasks and their worktrees",
@@ -20,6 +22,7 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
+	listCmd.Flags().BoolVar(&listAllFlag, "all", false, "print every task as flat text instead of the interactive picker (no task-id arg)")
 	rootCmd.AddCommand(listCmd)
 }
 
@@ -44,16 +47,28 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(args) == 1 {
-		taskID := args[0]
-		entry, found := task.FindEntry(taskEntries, taskID)
+	out := cmd.OutOrStdout()
+
+	switch {
+	case len(args) == 1:
+		entry, found := task.FindEntry(taskEntries, args[0])
 		if !found {
-			return fmt.Errorf("task %q not found under %s", taskID, root.TasksDir)
+			return fmt.Errorf("task %q not found under %s", args[0], root.TasksDir)
 		}
+		taskEntries = []task.Entry{entry}
+	case !listAllFlag:
+		if len(taskEntries) == 0 {
+			fmt.Fprintf(out, "no tasks found under %s\n", root.TasksDir)
+			return nil
+		}
+		taskID, err := selectOneFiltering("Task ID", taskIDOptions(taskEntries))
+		if err != nil {
+			return err
+		}
+		entry, _ := task.FindEntry(taskEntries, taskID)
 		taskEntries = []task.Entry{entry}
 	}
 
-	out := cmd.OutOrStdout()
 	if len(taskEntries) == 0 {
 		fmt.Fprintf(out, "no tasks found under %s\n", root.TasksDir)
 		return nil
