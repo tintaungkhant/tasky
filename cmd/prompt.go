@@ -79,13 +79,16 @@ func selectOne(title string, options []huh.Option[string]) (string, error) {
 	return selectOneDefault(title, options, "")
 }
 
-// selectOneFiltering prompts to pick one of options, starting in filter mode
-// with a taller list than selectOne's default — for pickers over lists that
-// may grow large (e.g. many tasks), where typing to search beats arrowing
-// through everything.
+// selectOneFiltering prompts to pick one of options, starting in filter
+// mode — for pickers over lists that may grow large (e.g. many tasks), where
+// typing to search beats arrowing through everything. Height is deliberately
+// left unset: huh@v1.0.0's Select pins the viewport's YOffset to the
+// selected index whenever an explicit Height is set, which breaks arrow-key
+// scrolling (the cursor appears stuck while the list scrolls under it).
+// Leaving Height unset takes the safe "size to fit" path instead.
 func selectOneFiltering(title string, options []huh.Option[string]) (string, error) {
 	var value string
-	if err := runForm(huh.NewSelect[string]().Title(title).Options(options...).Filtering(true).Height(15).Value(&value)); err != nil {
+	if err := runForm(huh.NewSelect[string]().Title(title).Options(options...).Filtering(true).Value(&value)); err != nil {
 		return "", err
 	}
 	return value, nil
