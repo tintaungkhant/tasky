@@ -3,7 +3,10 @@
 package task
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -47,4 +50,51 @@ func ParseTaskDirName(dirName string) (taskID, taskName string) {
 func WorktreePath(tasksDir, taskDirName, repoName, branch string) string {
 	sanitizedBranch := strings.ReplaceAll(branch, "/", "-")
 	return filepath.Join(tasksDir, taskDirName, repoName+"["+sanitizedBranch+"]")
+}
+
+// Entry is one task directory under a Root's tasksDir, split back into its ID
+// and optional human-readable name (see ParseTaskDirName).
+type Entry struct {
+	ID   string
+	Name string
+}
+
+// Label formats an entry for display: just the ID, or "ID (name)" when named.
+func (e Entry) Label() string {
+	if e.Name == "" {
+		return e.ID
+	}
+	return fmt.Sprintf("%s (%s)", e.ID, e.Name)
+}
+
+// ListEntries returns every task directory under tasksDir, parsed into
+// (ID, Name) pairs, sorted by ID. A missing tasksDir yields no entries.
+func ListEntries(tasksDir string) ([]Entry, error) {
+	entries, err := os.ReadDir(tasksDir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read tasks directory %s: %w", tasksDir, err)
+	}
+	var out []Entry
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		id, name := ParseTaskDirName(e.Name())
+		out = append(out, Entry{ID: id, Name: name})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+// FindEntry looks up a task by ID among entries (see ListEntries).
+func FindEntry(entries []Entry, id string) (Entry, bool) {
+	for _, e := range entries {
+		if e.ID == id {
+			return e, true
+		}
+	}
+	return Entry{}, false
 }

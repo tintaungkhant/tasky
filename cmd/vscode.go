@@ -15,6 +15,16 @@ import (
 	"github.com/tintaungkhant/tasky/internal/ui"
 )
 
+// taskIDOptions builds a Task ID select option per entry, labeled with its
+// name when set.
+func taskIDOptions(entries []task.Entry) []huh.Option[string] {
+	options := make([]huh.Option[string], 0, len(entries))
+	for _, e := range entries {
+		options = append(options, huh.NewOption(e.Label(), e.ID))
+	}
+	return options
+}
+
 var vscodeCmd = &cobra.Command{
 	Use:   "vscode [task-id]",
 	Short: "Generate a multi-root workspace file for a task's worktrees",
@@ -54,7 +64,7 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	taskEntries, err := listTaskEntries(root.TasksDir)
+	taskEntries, err := task.ListEntries(root.TasksDir)
 	if err != nil {
 		return err
 	}
@@ -67,12 +77,12 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 		if len(taskEntries) == 0 {
 			return fmt.Errorf("no tasks found under %s", root.TasksDir)
 		}
-		if taskID, err = promptSelectTaskID(taskEntries); err != nil {
+		if taskID, err = selectOne("Task ID", taskIDOptions(taskEntries)); err != nil {
 			return err
 		}
 	}
 
-	entry, found := findTaskEntry(taskEntries, taskID)
+	entry, found := task.FindEntry(taskEntries, taskID)
 	if !found {
 		return fmt.Errorf("task %q not found under %s", taskID, root.TasksDir)
 	}
@@ -111,25 +121,4 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 
 	fmt.Println(ui.Success("Wrote workspace file at %s", workspacePath))
 	return nil
-}
-
-func promptSelectTaskID(entries []taskEntry) (string, error) {
-	options := make([]huh.Option[string], 0, len(entries))
-	for _, e := range entries {
-		label := e.ID
-		if e.Name != "" {
-			label = fmt.Sprintf("%s (%s)", e.ID, e.Name)
-		}
-		options = append(options, huh.NewOption(label, e.ID))
-	}
-	var taskID string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title("Task ID").Options(options...).Value(&taskID),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", err
-	}
-	return taskID, nil
 }

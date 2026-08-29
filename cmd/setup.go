@@ -88,44 +88,38 @@ func promptAction(cfg *config.Config) (string, error) {
 	}
 	options = append(options, huh.NewOption("Done", actionDone))
 
-	var action string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("What would you like to do?").
-				Options(options...).
-				Value(&action),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", err
+	return selectOne("What would you like to do?", options)
+}
+
+// nameAndPathFields are the Root fields prompted first when adding a root,
+// before its tasks_dir default (derived from path) can be computed.
+func nameAndPathFields(r *config.Root) []huh.Field {
+	return []huh.Field{
+		huh.NewInput().Title("Root name").Value(&r.Name).Validate(requireNonEmpty),
+		huh.NewInput().Title("Root path (absolute)").Value(&r.Path).Validate(requireNonEmpty),
 	}
-	return action, nil
+}
+
+// tasksDirAndTemplateFields are the remaining Root fields, shared between
+// adding and editing a root.
+func tasksDirAndTemplateFields(r *config.Root) []huh.Field {
+	return []huh.Field{
+		huh.NewInput().Title("Tasks directory (absolute)").Value(&r.TasksDir).Validate(requireNonEmpty),
+		huh.NewInput().Title("Branch template").
+			Description("Use {task-id} and {branch} placeholders, e.g. task/{task-id}/{branch}").
+			Value(&r.BranchTemplate).Validate(requireNonEmpty),
+	}
 }
 
 func addRoot(cfg *config.Config) error {
 	var r config.Root
-	nameAndPath := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title("Root name").Value(&r.Name).Validate(requireNonEmpty),
-			huh.NewInput().Title("Root path (absolute)").Value(&r.Path).Validate(requireNonEmpty),
-		),
-	)
-	if err := nameAndPath.Run(); err != nil {
+	if err := runForm(nameAndPathFields(&r)...); err != nil {
 		return err
 	}
 
 	r.TasksDir = filepath.Join(r.Path, "tasks")
 	r.BranchTemplate = "{branch}"
-	rest := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title("Tasks directory (absolute)").Value(&r.TasksDir).Validate(requireNonEmpty),
-			huh.NewInput().Title("Branch template").
-				Description("Use {task-id} and {branch} placeholders, e.g. task/{task-id}/{branch}").
-				Value(&r.BranchTemplate).Validate(requireNonEmpty),
-		),
-	)
-	if err := rest.Run(); err != nil {
+	if err := runForm(tasksDirAndTemplateFields(&r)...); err != nil {
 		return err
 	}
 
@@ -143,17 +137,8 @@ func editRoot(cfg *config.Config) error {
 		return fmt.Errorf("root %q not found", name)
 	}
 
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title("Root name").Value(&r.Name).Validate(requireNonEmpty),
-			huh.NewInput().Title("Root path (absolute)").Value(&r.Path).Validate(requireNonEmpty),
-			huh.NewInput().Title("Tasks directory (absolute)").Value(&r.TasksDir).Validate(requireNonEmpty),
-			huh.NewInput().Title("Branch template").
-				Description("Use {task-id} and {branch} placeholders, e.g. task/{task-id}/{branch}").
-				Value(&r.BranchTemplate).Validate(requireNonEmpty),
-		),
-	)
-	return form.Run()
+	fields := append(nameAndPathFields(r), tasksDirAndTemplateFields(r)...)
+	return runForm(fields...)
 }
 
 func removeRoot(cfg *config.Config) error {
@@ -166,25 +151,9 @@ func removeRoot(cfg *config.Config) error {
 }
 
 func selectRootName(cfg *config.Config, title string) (string, error) {
-	options := make([]huh.Option[string], 0, len(cfg.Roots))
+	names := make([]string, 0, len(cfg.Roots))
 	for _, r := range cfg.Roots {
-		options = append(options, huh.NewOption(r.Name, r.Name))
+		names = append(names, r.Name)
 	}
-	var name string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title(title).Options(options...).Value(&name),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", err
-	}
-	return name, nil
-}
-
-func requireNonEmpty(s string) error {
-	if s == "" {
-		return fmt.Errorf("required")
-	}
-	return nil
+	return selectOne(title, stringOptions(names))
 }

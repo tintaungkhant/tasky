@@ -25,7 +25,7 @@ func Errorf(format string, args ...any) string {
 
 // Success formats a success-styled message, prefixed with a checkmark.
 func Success(format string, args ...any) string {
-	return successStyle.Render("✓ "+fmt.Sprintf(format, args...))
+	return successStyle.Render("✓ " + fmt.Sprintf(format, args...))
 }
 
 // Info formats an info-styled message.
@@ -35,7 +35,7 @@ func Info(format string, args ...any) string {
 
 // Warn formats a warning-styled message, prefixed with a warning marker.
 func Warn(format string, args ...any) string {
-	return warnStyle.Render("! "+fmt.Sprintf(format, args...))
+	return warnStyle.Render("! " + fmt.Sprintf(format, args...))
 }
 
 // Label styles a field label (e.g. "Task:", "Branch:") for aligned summaries.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -78,19 +79,19 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	taskEntries, err := listTaskEntries(root.TasksDir)
+	taskEntries, err := task.ListEntries(root.TasksDir)
 	if err != nil {
 		return err
 	}
 
 	if taskID == "" {
-		if taskID, _, err = promptSelectOrNewTaskID(taskEntries); err != nil {
+		if taskID, err = promptSelectOrNewTaskID(taskEntries); err != nil {
 			return err
 		}
 	}
 
 	var taskName string
-	if existing, found := findTaskEntry(taskEntries, taskID); found {
+	if existing, found := task.FindEntry(taskEntries, taskID); found {
 		taskName = existing.Name
 	} else {
 		taskName = addNameFlag
@@ -132,7 +133,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	// A branch that already exists verbatim (typed, selected, or passed as an
 	// arg) is reused as-is; only a genuinely new branch name gets the template.
 	renderedBranch := branch
-	if !branchAlreadyRendered && !contains(branches, branch) {
+	if !branchAlreadyRendered && !slices.Contains(branches, branch) {
 		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, taskName, branch)
 	}
 	worktreePath := task.WorktreePath(root.TasksDir, taskDirName, repoName, renderedBranch)
@@ -141,7 +142,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("worktree path already exists: %s", worktreePath)
 	}
 
-	reuseExisting := contains(branches, renderedBranch)
+	reuseExisting := slices.Contains(branches, renderedBranch)
 
 	if busyPath, busy := checkedOut[renderedBranch]; reuseExisting && busy {
 		if busyPath == repoRoot {
@@ -175,52 +176,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func promptText(title string) (string, error) {
-	var value string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title(title).Value(&value).Validate(requireNonEmpty),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", err
-	}
-	return value, nil
-}
-
-const newOptionValue = "\x00new"
-
-// promptSelectOrNew offers existing options plus a "+ New" entry that falls
-// through to a free-text prompt. isNew reports whether the returned value
-// came from that free-text prompt rather than being picked from options.
-func promptSelectOrNew(selectTitle, inputTitle string, options []string) (value string, isNew bool, err error) {
-	if len(options) == 0 {
-		v, err := promptText(inputTitle)
-		return v, true, err
-	}
-
-	huhOptions := make([]huh.Option[string], 0, len(options)+1)
-	for _, o := range options {
-		huhOptions = append(huhOptions, huh.NewOption(o, o))
-	}
-	huhOptions = append(huhOptions, huh.NewOption("+ New", newOptionValue))
-
-	var selected string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title(selectTitle).Options(huhOptions...).Value(&selected),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", false, err
-	}
-	if selected != newOptionValue {
-		return selected, false, nil
-	}
-	v, err := promptText(inputTitle)
-	return v, true, err
-}
-
 // promptBranchStep resolves the worktree's branch interactively. The
 // developer types a branch name, pre-filled with base (leaving it unchanged
 // or clearing it means "use base itself" — e.g. to reuse an existing branch
@@ -230,12 +185,7 @@ func promptSelectOrNew(selectTitle, inputTitle string, options []string) (value 
 // is already final and must not be passed through task.RenderBranch again.
 func promptBranchStep(taskID, taskName, base, template string) (branch string, alreadyRendered bool, err error) {
 	var typed string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title("Branch name").Placeholder(base).Value(&typed),
-		),
-	)
-	if err := form.Run(); err != nil {
+	if err := runForm(huh.NewInput().Title("Branch name").Placeholder(base).Value(&typed)); err != nil {
 		return "", false, err
 	}
 	typed = strings.TrimSpace(typed)
@@ -256,124 +206,25 @@ func promptBranchStep(taskID, taskName, base, template string) (branch string, a
 	}
 	// Reusing base as-is (blank input) defaults to as-is; typing a distinct
 	// new name defaults to the prefixed form, since that's the template's point.
-	selected := candidate
+	def := candidate
 	if typed != "" {
-		selected = rendered
+		def = rendered
 	}
-	pickForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title("Use branch as").Options(options...).Value(&selected),
-		),
-	)
-	if err := pickForm.Run(); err != nil {
+	selected, err := selectOneDefault("Use branch as", options, def)
+	if err != nil {
 		return "", false, err
 	}
 	return selected, true, nil
 }
 
-// taskEntry is one task directory under a Root's tasksDir, split back into
-// its ID and optional human-readable name (see task.ParseTaskDirName).
-type taskEntry struct {
-	ID   string
-	Name string
-}
-
-// listTaskEntries returns every task directory under tasksDir, parsed into
-// (ID, Name) pairs. Task IDs already in use by any repo under the same Root.
-func listTaskEntries(tasksDir string) ([]taskEntry, error) {
-	entries, err := os.ReadDir(tasksDir)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read tasks directory %s: %w", tasksDir, err)
-	}
-	var out []taskEntry
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		id, name := task.ParseTaskDirName(e.Name())
-		out = append(out, taskEntry{ID: id, Name: name})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, nil
-}
-
-// findTaskEntry looks up a task by ID among entries (see listTaskEntries).
-func findTaskEntry(entries []taskEntry, id string) (taskEntry, bool) {
-	for _, e := range entries {
-		if e.ID == id {
-			return e, true
-		}
-	}
-	return taskEntry{}, false
-}
-
 // promptSelectOrNewTaskID offers existing task IDs (labeled with their name,
 // if any) plus a "+ New" entry that falls through to a free-text prompt.
-func promptSelectOrNewTaskID(entries []taskEntry) (value string, isNew bool, err error) {
-	if len(entries) == 0 {
-		v, err := promptText("Task ID")
-		return v, true, err
-	}
-
-	huhOptions := make([]huh.Option[string], 0, len(entries)+1)
-	for _, e := range entries {
-		label := e.ID
-		if e.Name != "" {
-			label = fmt.Sprintf("%s (%s)", e.ID, e.Name)
-		}
-		huhOptions = append(huhOptions, huh.NewOption(label, e.ID))
-	}
-	huhOptions = append(huhOptions, huh.NewOption("+ New", newOptionValue))
-
-	var selected string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title("Task ID").Options(huhOptions...).Value(&selected),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", false, err
-	}
-	if selected != newOptionValue {
-		return selected, false, nil
-	}
-	v, err := promptText("Task ID")
-	return v, true, err
-}
-
-// promptOptionalText prompts for free text with no non-empty validation,
-// trimming whitespace. An empty result is a valid answer ("skip").
-func promptOptionalText(title string) (string, error) {
-	var value string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title(title).Value(&value),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(value), nil
+func promptSelectOrNewTaskID(entries []task.Entry) (string, error) {
+	return selectWithNew("Task ID", "Task ID", taskIDOptions(entries))
 }
 
 func promptSelectBase(branches []string, current string) (string, error) {
-	options := make([]huh.Option[string], 0, len(branches))
-	for _, b := range branches {
-		options = append(options, huh.NewOption(b, b))
-	}
-	base := current
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title("Base branch").Options(options...).Value(&base),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return "", err
-	}
-	return base, nil
+	return selectOneDefault("Base branch", stringOptions(branches), current)
 }
 
 func confirmCreate(taskID, taskName, repoName, base, branch, worktreePath string, reuseExisting bool) (bool, error) {
@@ -390,25 +241,7 @@ func confirmCreate(taskID, taskName, repoName, base, branch, worktreePath string
 	}
 	fmt.Println(ui.Label("Worktree:  "), worktreePath)
 
-	confirmed := true
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().Title("Create worktree?").Value(&confirmed),
-		),
-	)
-	if err := form.Run(); err != nil {
-		return false, err
-	}
-	return confirmed, nil
-}
-
-func contains(list []string, s string) bool {
-	for _, item := range list {
-		if item == s {
-			return true
-		}
-	}
-	return false
+	return promptConfirm("Create worktree?")
 }
 
 // resolveRepo determines the repo's root directory and its configured Root.
@@ -468,17 +301,8 @@ func resolveRepo(cfg *config.Config, cwd, repoArg string) (string, *config.Root,
 		return "", nil, fmt.Errorf("no git repositories found under root %s", root.Path)
 	}
 
-	var selected string
-	options := make([]huh.Option[string], 0, len(repos))
-	for _, r := range repos {
-		options = append(options, huh.NewOption(r, r))
-	}
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().Title("Which repo?").Options(options...).Value(&selected),
-		),
-	)
-	if err := form.Run(); err != nil {
+	selected, err := selectOne("Which repo?", stringOptions(repos))
+	if err != nil {
 		return "", nil, err
 	}
 	return filepath.Join(root.Path, selected), root, nil

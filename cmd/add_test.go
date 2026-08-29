@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/tintaungkhant/tasky/internal/config"
@@ -188,7 +189,7 @@ func TestAddWorktreePathAlreadyExists(t *testing.T) {
 	if lerr != nil {
 		t.Fatal(lerr)
 	}
-	if contains(branches, "task/CRO-006-collide/feat/x") {
+	if slices.Contains(branches, "task/CRO-006-collide/feat/x") {
 		t.Fatal("branch should not have been created when worktree path already existed")
 	}
 }
@@ -345,36 +346,6 @@ func TestAddGitFailureWrapped(t *testing.T) {
 	}
 	if bytes.Contains([]byte(err.Error()), []byte("exit status")) {
 		t.Fatalf("error leaked raw exec.ExitError: %q", err.Error())
-	}
-}
-
-func TestListTaskEntries(t *testing.T) {
-	tasksDir := t.TempDir()
-
-	entries, err := listTaskEntries(filepath.Join(tasksDir, "does-not-exist"))
-	if err != nil {
-		t.Fatalf("listTaskEntries on missing dir: %v", err)
-	}
-	if len(entries) != 0 {
-		t.Fatalf("listTaskEntries on missing dir = %v, want empty", entries)
-	}
-
-	for _, dir := range []string{"CRO-002", "CRO-001[laravel-upgrade]"} {
-		if err := os.MkdirAll(filepath.Join(tasksDir, dir), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(tasksDir, "not-a-dir"), []byte(""), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	entries, err = listTaskEntries(tasksDir)
-	if err != nil {
-		t.Fatalf("listTaskEntries: %v", err)
-	}
-	want := []taskEntry{{ID: "CRO-001", Name: "laravel-upgrade"}, {ID: "CRO-002", Name: ""}}
-	if len(entries) != len(want) || entries[0] != want[0] || entries[1] != want[1] {
-		t.Fatalf("listTaskEntries = %v, want %v", entries, want)
 	}
 }
 
