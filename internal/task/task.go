@@ -19,37 +19,37 @@ func RenderBranch(template, taskID, taskName, branch string) string {
 }
 
 // TaskDirName computes the name of a task's directory under tasksDir: just
-// taskID when taskName is empty, or taskID+"[taskName]" when it's set. This
+// taskID when taskName is empty, or taskID+"@"+taskName when it's set. This
 // mirrors WorktreePath's branch-folding so a task's optional human-readable
-// name rides along in the directory listing without a second lookup.
+// name rides along in the directory listing without a second lookup. "@" is
+// used rather than "[...]" because brackets are glob special characters and
+// broke matching in some projects.
 func TaskDirName(taskID, taskName string) string {
 	if taskName == "" {
 		return taskID
 	}
-	return taskID + "[" + taskName + "]"
+	return taskID + "@" + taskName
 }
 
 // ParseTaskDirName reverses TaskDirName: given a task directory's name, it
-// returns the taskID and taskName (empty if the directory has no [name]
+// returns the taskID and taskName (empty if the directory has no "@name"
 // suffix). It's how callers recover a task's ID to match against typed or
 // selected input, regardless of whether that task has a name.
 func ParseTaskDirName(dirName string) (taskID, taskName string) {
-	if strings.HasSuffix(dirName, "]") {
-		if i := strings.Index(dirName, "["); i != -1 {
-			return dirName[:i], dirName[i+1 : len(dirName)-1]
-		}
+	if i := strings.Index(dirName, "@"); i != -1 {
+		return dirName[:i], dirName[i+1:]
 	}
 	return dirName, ""
 }
 
 // WorktreePath computes the path a Task's worktree for repoName and branch
-// lives at: <tasksDir>/<taskDirName>/<repoName>[<branch>], with slashes in
+// lives at: <tasksDir>/<taskDirName>/<repoName>@<branch>, with slashes in
 // branch replaced by dashes so the whole thing stays a single path segment.
 // Folding the branch into the path lets the same task+repo have multiple
 // worktrees checked out on different branches at once.
 func WorktreePath(tasksDir, taskDirName, repoName, branch string) string {
 	sanitizedBranch := strings.ReplaceAll(branch, "/", "-")
-	return filepath.Join(tasksDir, taskDirName, repoName+"["+sanitizedBranch+"]")
+	return filepath.Join(tasksDir, taskDirName, repoName+"@"+sanitizedBranch)
 }
 
 // Entry is one task directory under a Root's tasksDir, split back into its ID
@@ -94,10 +94,8 @@ func ListEntries(tasksDir string) ([]Entry, error) {
 // dashes, so not reversible back to the real branch name — callers needing
 // the real branch should read it from the worktree itself).
 func ParseWorktreeDirName(dirName string) (repoName, sanitizedBranch string) {
-	if strings.HasSuffix(dirName, "]") {
-		if i := strings.Index(dirName, "["); i != -1 {
-			return dirName[:i], dirName[i+1 : len(dirName)-1]
-		}
+	if i := strings.Index(dirName, "@"); i != -1 {
+		return dirName[:i], dirName[i+1:]
 	}
 	return dirName, ""
 }

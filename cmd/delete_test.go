@@ -70,10 +70,10 @@ func TestDeleteSingleRepoLeavesOtherWorktrees(t *testing.T) {
 	}
 
 	taskDir := filepath.Join(tasksDir, "CRO-002")
-	if _, err := os.Stat(filepath.Join(taskDir, "project-a[task-CRO-002-feat-x]")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(taskDir, "project-a@task-CRO-002-feat-x")); !os.IsNotExist(err) {
 		t.Fatal("project-a worktree should have been removed")
 	}
-	if _, err := os.Stat(filepath.Join(taskDir, "project-b[task-CRO-002-feat-y]", "README.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(taskDir, "project-b@task-CRO-002-feat-y", "README.md")); err != nil {
 		t.Fatalf("project-b worktree should still exist: %v", err)
 	}
 }
@@ -139,10 +139,10 @@ func TestDeleteRepoAndBranchRemovesExactWorktree(t *testing.T) {
 	}
 
 	taskDir := filepath.Join(tasksDir, "CRO-005")
-	if _, err := os.Stat(filepath.Join(taskDir, "project-a[task-CRO-005-feat-a]")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(taskDir, "project-a@task-CRO-005-feat-a")); !os.IsNotExist(err) {
 		t.Fatal("feat/a worktree should have been removed")
 	}
-	if _, err := os.Stat(filepath.Join(taskDir, "project-a[task-CRO-005-feat-b]", "README.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(taskDir, "project-a@task-CRO-005-feat-b", "README.md")); err != nil {
 		t.Fatalf("feat/b worktree should still exist: %v", err)
 	}
 }
@@ -155,7 +155,7 @@ func TestDeleteDirtyWorktreeRequiresForce(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	wtPath := filepath.Join(repoPath, "..", "tasks", "CRO-006", "project-a[task-CRO-006-feat-payment]")
+	wtPath := filepath.Join(repoPath, "..", "tasks", "CRO-006", "project-a@task-CRO-006-feat-payment")
 	if err := os.WriteFile(filepath.Join(wtPath, "dirty.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}

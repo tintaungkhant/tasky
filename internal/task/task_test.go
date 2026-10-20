@@ -66,8 +66,8 @@ func TestTaskDirName(t *testing.T) {
 	if got := TaskDirName("CRO-001", ""); got != "CRO-001" {
 		t.Fatalf("TaskDirName() = %q, want %q", got, "CRO-001")
 	}
-	if got := TaskDirName("CRO-001", "laravel-upgrade"); got != "CRO-001[laravel-upgrade]" {
-		t.Fatalf("TaskDirName() = %q, want %q", got, "CRO-001[laravel-upgrade]")
+	if got := TaskDirName("CRO-001", "laravel-upgrade"); got != "CRO-001@laravel-upgrade" {
+		t.Fatalf("TaskDirName() = %q, want %q", got, "CRO-001@laravel-upgrade")
 	}
 }
 
@@ -78,7 +78,7 @@ func TestParseTaskDirName(t *testing.T) {
 		wantTaskName string
 	}{
 		{"CRO-001", "CRO-001", ""},
-		{"CRO-001[laravel-upgrade]", "CRO-001", "laravel-upgrade"},
+		{"CRO-001@laravel-upgrade", "CRO-001", "laravel-upgrade"},
 	}
 	for _, tt := range tests {
 		id, name := ParseTaskDirName(tt.dirName)
@@ -90,7 +90,7 @@ func TestParseTaskDirName(t *testing.T) {
 
 func TestWorktreePath(t *testing.T) {
 	got := WorktreePath("/Users/dev/Work/company/tasks", "CRO-001-payment", "project-a", "feat/payment-bank-a")
-	want := "/Users/dev/Work/company/tasks/CRO-001-payment/project-a[feat-payment-bank-a]"
+	want := "/Users/dev/Work/company/tasks/CRO-001-payment/project-a@feat-payment-bank-a"
 	if got != want {
 		t.Fatalf("WorktreePath() = %q, want %q", got, want)
 	}
@@ -115,7 +115,7 @@ func TestListEntries(t *testing.T) {
 		t.Fatalf("ListEntries on missing dir = %v, want empty", entries)
 	}
 
-	for _, dir := range []string{"CRO-002", "CRO-001[laravel-upgrade]"} {
+	for _, dir := range []string{"CRO-002", "CRO-001@laravel-upgrade"} {
 		if err := os.MkdirAll(filepath.Join(tasksDir, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -140,8 +140,8 @@ func TestParseWorktreeDirName(t *testing.T) {
 		wantRepoName  string
 		wantSanitized string
 	}{
-		{"project-a[feat-payment]", "project-a", "feat-payment"},
-		{"project-a[task-CRO-001-feat-payment]", "project-a", "task-CRO-001-feat-payment"},
+		{"project-a@feat-payment", "project-a", "feat-payment"},
+		{"project-a@task-CRO-001-feat-payment", "project-a", "task-CRO-001-feat-payment"},
 	}
 	for _, tt := range tests {
 		repoName, sanitized := ParseWorktreeDirName(tt.dirName)
@@ -163,7 +163,7 @@ func TestListWorktrees(t *testing.T) {
 	}
 
 	taskDir := filepath.Join(tasksDir, "CRO-001")
-	for _, dir := range []string{"project-a[feat-a]", "project-b[feat-b]"} {
+	for _, dir := range []string{"project-a@feat-a", "project-b@feat-b"} {
 		if err := os.MkdirAll(filepath.Join(taskDir, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -177,8 +177,8 @@ func TestListWorktrees(t *testing.T) {
 		t.Fatalf("ListWorktrees: %v", err)
 	}
 	want := []WorktreeEntry{
-		{RepoName: "project-a", Path: filepath.Join(taskDir, "project-a[feat-a]")},
-		{RepoName: "project-b", Path: filepath.Join(taskDir, "project-b[feat-b]")},
+		{RepoName: "project-a", Path: filepath.Join(taskDir, "project-a@feat-a")},
+		{RepoName: "project-b", Path: filepath.Join(taskDir, "project-b@feat-b")},
 	}
 	if len(worktrees) != len(want) || worktrees[0] != want[0] || worktrees[1] != want[1] {
 		t.Fatalf("ListWorktrees = %v, want %v", worktrees, want)

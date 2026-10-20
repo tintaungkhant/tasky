@@ -105,7 +105,7 @@ func TestAddHappyPathEndToEnd(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	wantWorktree := filepath.Join(tasksDir, "CRO-001-payment", "project-a[task-CRO-001-payment-feat-payment]")
+	wantWorktree := filepath.Join(tasksDir, "CRO-001-payment", "project-a@task-CRO-001-payment-feat-payment")
 	if _, err := os.Stat(filepath.Join(wantWorktree, "README.md")); err != nil {
 		t.Fatalf("worktree not created at %s: %v", wantWorktree, err)
 	}
@@ -122,7 +122,7 @@ func TestAddExplicitRepoFromRootDir(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	wantWorktree := filepath.Join(tasksDir, "CRO-002-refund", "project-a[task-CRO-002-refund-feat-refund]")
+	wantWorktree := filepath.Join(tasksDir, "CRO-002-refund", "project-a@task-CRO-002-refund-feat-refund")
 	if _, err := os.Stat(filepath.Join(wantWorktree, "README.md")); err != nil {
 		t.Fatalf("worktree not created at %s: %v", wantWorktree, err)
 	}
@@ -165,7 +165,7 @@ func TestAddFromFlagOverridesBase(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	wantWorktree := filepath.Join(tasksDir, "CRO-004-base", "project-a[task-CRO-004-base-feat-x]")
+	wantWorktree := filepath.Join(tasksDir, "CRO-004-base", "project-a@task-CRO-004-base-feat-x")
 	if got := currentBranch(t, wantWorktree); got != "task/CRO-004-base/feat/x" {
 		t.Fatalf("worktree branch = %q, want task/CRO-004-base/feat/x", got)
 	}
@@ -175,7 +175,7 @@ func TestAddWorktreePathAlreadyExists(t *testing.T) {
 	_, repoPath, tasksDir := setupRootWithRepo(t)
 	chdir(t, repoPath)
 
-	existing := filepath.Join(tasksDir, "CRO-006-collide", "project-a[task-CRO-006-collide-feat-x]")
+	existing := filepath.Join(tasksDir, "CRO-006-collide", "project-a@task-CRO-006-collide-feat-x")
 	if err := os.MkdirAll(existing, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -205,8 +205,8 @@ func TestAddSameTaskAndRepoDifferentBranches(t *testing.T) {
 		t.Fatalf("tasky add (branch b): %v", err)
 	}
 
-	wtA := filepath.Join(tasksDir, "CRO-009-multi", "project-a[task-CRO-009-multi-feat-payment-bank-a]")
-	wtB := filepath.Join(tasksDir, "CRO-009-multi", "project-a[task-CRO-009-multi-feat-payment-bank-b]")
+	wtA := filepath.Join(tasksDir, "CRO-009-multi", "project-a@task-CRO-009-multi-feat-payment-bank-a")
+	wtB := filepath.Join(tasksDir, "CRO-009-multi", "project-a@task-CRO-009-multi-feat-payment-bank-b")
 	if _, err := os.Stat(filepath.Join(wtA, "README.md")); err != nil {
 		t.Fatalf("worktree a not created at %s: %v", wtA, err)
 	}
@@ -223,7 +223,7 @@ func TestAddWithNameFlagCreatesBracketedTaskFolder(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	wantWorktree := filepath.Join(tasksDir, "CRO-030[laravel-upgrade]", "project-a[task-CRO-030-feat-x]")
+	wantWorktree := filepath.Join(tasksDir, "CRO-030@laravel-upgrade", "project-a@task-CRO-030-feat-x")
 	if _, err := os.Stat(filepath.Join(wantWorktree, "README.md")); err != nil {
 		t.Fatalf("worktree not created at %s: %v", wantWorktree, err)
 	}
@@ -246,11 +246,11 @@ func TestAddReuseExistingTaskIDKeepsName(t *testing.T) {
 		t.Fatalf("tasky add (project-b): %v", err)
 	}
 
-	taskDir := filepath.Join(tasksDir, "CRO-031[laravel-upgrade]")
-	if _, err := os.Stat(filepath.Join(taskDir, "project-b[task-CRO-031-feat-y]", "README.md")); err != nil {
+	taskDir := filepath.Join(tasksDir, "CRO-031@laravel-upgrade")
+	if _, err := os.Stat(filepath.Join(taskDir, "project-b@task-CRO-031-feat-y", "README.md")); err != nil {
 		t.Fatalf("project-b worktree not created under %s: %v", taskDir, err)
 	}
-	if _, err := os.Stat(filepath.Join(tasksDir, "CRO-031[should-be-ignored]")); err == nil {
+	if _, err := os.Stat(filepath.Join(tasksDir, "CRO-031@should-be-ignored")); err == nil {
 		t.Fatalf("a second task folder was created for the ignored --name")
 	}
 }
@@ -264,7 +264,7 @@ func TestAddRawBranchMatchingExistingReusedVerbatim(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	wantWorktree := filepath.Join(tasksDir, "CRO-002", "project-a[feat-payment]")
+	wantWorktree := filepath.Join(tasksDir, "CRO-002", "project-a@feat-payment")
 	if got := currentBranch(t, wantWorktree); got != "feat/payment" {
 		t.Fatalf("worktree branch = %q, want feat/payment (reused verbatim, not templated)", got)
 	}
@@ -307,7 +307,7 @@ func TestAddTasksDirAutoCreated(t *testing.T) {
 	if err := execAdd(t, "CRO-008-autocreate", "feat/x"); err != nil {
 		t.Fatalf("tasky add: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(tasksDir, "CRO-008-autocreate", "project-a[task-CRO-008-autocreate-feat-x]")); err != nil {
+	if _, err := os.Stat(filepath.Join(tasksDir, "CRO-008-autocreate", "project-a@task-CRO-008-autocreate-feat-x")); err != nil {
 		t.Fatalf("tasks_dir not auto-created: %v", err)
 	}
 }
@@ -359,7 +359,7 @@ func TestAddExistingBranchReuse(t *testing.T) {
 		t.Fatalf("tasky add: %v", err)
 	}
 
-	wantWorktree := filepath.Join(tasksDir, "CRO-005-existing", "project-a[task-CRO-005-existing-feat-x]")
+	wantWorktree := filepath.Join(tasksDir, "CRO-005-existing", "project-a@task-CRO-005-existing-feat-x")
 	if got := currentBranch(t, wantWorktree); got != renderedBranch {
 		t.Fatalf("worktree branch = %q, want %q", got, renderedBranch)
 	}

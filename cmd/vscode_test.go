@@ -38,7 +38,7 @@ func TestVSCodeGeneratesWorkspaceFile(t *testing.T) {
 	if len(ws.Folders) != 1 {
 		t.Fatalf("workspace folders = %v, want 1 entry", ws.Folders)
 	}
-	wantFolder := "./project-a[task-CRO-020-multi-feat-x]"
+	wantFolder := "./project-a@task-CRO-020-multi-feat-x"
 	if ws.Folders[0].Path != wantFolder {
 		t.Fatalf("workspace folder path = %q, want %q", ws.Folders[0].Path, wantFolder)
 	}
@@ -102,7 +102,7 @@ func TestVSCodeWorkspaceFileNameIncludesTaskName(t *testing.T) {
 		t.Fatalf("vscode: %v", err)
 	}
 
-	workspacePath := filepath.Join(tasksDir, "CRO-023[laravel-upgrade]", "CRO-023[laravel-upgrade].code-workspace")
+	workspacePath := filepath.Join(tasksDir, "CRO-023@laravel-upgrade", "CRO-023@laravel-upgrade.code-workspace")
 	if _, err := os.Stat(workspacePath); err != nil {
 		t.Fatalf("workspace file not created at %s: %v", workspacePath, err)
 	}
