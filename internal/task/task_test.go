@@ -90,7 +90,7 @@ func TestParseTaskDirName(t *testing.T) {
 
 func TestWorktreePath(t *testing.T) {
 	got := WorktreePath("/Users/dev/Work/company/tasks", "CRO-001-payment", "project-a", "feat/payment-bank-a")
-	want := "/Users/dev/Work/company/tasks/CRO-001-payment/project-a@feat-payment-bank-a"
+	want := filepath.FromSlash("/Users/dev/Work/company/tasks/CRO-001-payment/project-a@feat-payment-bank-a")
 	if got != want {
 		t.Fatalf("WorktreePath() = %q, want %q", got, want)
 	}
