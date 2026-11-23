@@ -161,4 +161,4 @@ internal/task/    Pure domain logic: branch rendering, task/worktree paths
 internal/ui/      Terminal styling
 ```
 
-Domain vocabulary is in [CONTEXT.md](CONTEXT.md).
+Domain vocabulary is in [docs/glossary.md](docs/glossary.md).

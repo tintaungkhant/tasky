@@ -30,13 +30,21 @@ Discussing is not planning. When the user explores an idea or asks "what if" (fo
 
 Settled decisions. Do not reopen one unless the user does. When a decision changes, strike the old line through and add the date.
 
-- (none yet)
+- Go, with `spf13/cobra` for commands and `charmbracelet/huh` for interactive prompts.
+- Config is YAML at `~/.config/tasky/config.yaml` (`$TASKY_CONFIG` overrides).
+- Git operations shell out to the `git` binary via `os/exec`; no git library.
+- Task ID and branch are substituted into the Branch Template verbatim, with no sanitization; `git` rejects invalid names.
+- Git failures surface as clean CLI errors carrying git's stderr, never a raw `exec.ExitError` or stack trace.
+- A missing `tasks_dir` is created automatically.
+- `internal/git` tests run against real temp repos (`t.TempDir()` + `git init`), no exec mocking. Interactive `huh` prompt paths are not unit tested.
 
 ### Out of scope
 
 Features deliberately left out or removed. Do not add them back without asking.
 
-- (none yet)
+- Any VCS other than git.
+- Git commit, push, pull, merge or rebase.
+- PR, Jira or CI/CD integration.
 
 ## Generated files
 
@@ -48,9 +56,9 @@ Do not hand-edit these; a regenerate overwrites hand edits. Regenerate with the 
 
 No deploy plan yet. Do not deploy or change servers or cloud resources. When the user is ready, they run `ryan-ship`.
 
-## Domain docs
+## Domain terms
 
-Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`. Use the glossary's terms.
+`docs/glossary.md` defines the domain terms (Root, Repo, Task, Task ID, Tasks Directory, Branch Template). Use them in code, tests, tickets and messages; avoid the synonyms it lists.
 
 ## Docs
 
