@@ -1,3 +1,5 @@
+> **Superseded (2026-11-23):** tickets and backlog now live in GitHub issues (`gh`). See `AGENTS.md` → "Planner". The `.scratch/` files below are kept as history.
+
 # Issue tracker: Local Markdown
 
 Issues and specs for this repo live as markdown files in `.scratch/`.
