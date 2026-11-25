@@ -27,7 +27,11 @@ func (m Manager) Remove(repo store.Repo, wt store.Worktree, deleteBranch, forceW
 			return err
 		}
 	}
-	c, err := m.Store.ReserveCleanup(wt, branch, revision, deleteBranch, forceWorktree, forceBranch)
+	repoIdentity, err := git.WorktreeIdentity(repo.Path)
+	if err != nil {
+		return err
+	}
+	c, err := m.Store.ReserveCleanup(wt, branch, revision, deleteBranch, forceWorktree, forceBranch, repoIdentity)
 	if err != nil {
 		return err
 	}
@@ -45,6 +49,16 @@ func samePath(a, b string) bool {
 func (m Manager) RecoverCleanup(repo store.Repo, c store.Cleanup, forceWorktree, forceBranch bool) error {
 	err := m.Store.ExecuteCleanup(c.ID, forceWorktree, forceBranch, func(op store.Cleanup) (bool, error) {
 		removed := op.Removed
+		if op.RepoIdentity == "" {
+			return removed, fmt.Errorf("cleanup predates Repo identity verification; inspect Git, then --forget intent and review remaining mappings and branches manually")
+		}
+		repoIdentity, err := git.WorktreeIdentity(repo.Path)
+		if err != nil {
+			return removed, err
+		}
+		if repoIdentity != op.RepoIdentity {
+			return removed, fmt.Errorf("Repo identity mismatch at %s; replacement Repo is protected; restore the original Repo location or --forget intent after review", repo.Path)
+		}
 		if !removed {
 			if _, err := os.Stat(op.Path); os.IsNotExist(err) {
 				// Git may have completed immediately before a crash. Only forget the

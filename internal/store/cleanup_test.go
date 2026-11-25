@@ -57,3 +57,31 @@ func TestCleanupSerializesAndPreservesIntent(t *testing.T) {
 		t.Fatalf("unfinished: %+v %+v", rows, ops)
 	}
 }
+
+func TestVersion4CleanupMigrationPreservesPendingIntent(t *testing.T) {
+	base := t.TempDir()
+	path := filepath.Join(base, "db")
+	a := openTestStore(t, path)
+	root, _ := a.CreateRoot("root", base)
+	repo, _ := a.CreateRepo(root.ID, "repo", base)
+	wt, err := a.Attach(root.ID, "T", "", repo.ID, filepath.Join(base, "wt"), "", "identity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	op, err := a.ReserveCleanup(wt, "branch", "revision", true, false, false, "repo-proof")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.db.Exec("ALTER TABLE cleanups DROP COLUMN repo_identity; PRAGMA user_version = 4;"); err != nil {
+		t.Fatal(err)
+	}
+	b := openTestStore(t, path)
+	ops, err := b.ListCleanups(root.ID)
+	if err != nil || len(ops) != 1 || ops[0].ID != op.ID || ops[0].RepoIdentity != "" {
+		t.Fatalf("migrated intent: %+v %v", ops, err)
+	}
+	rows, err := b.ListWorktrees(wt.TaskID)
+	if err != nil || len(rows) != 1 || rows[0] != wt {
+		t.Fatalf("migrated mapping: %+v %v", rows, err)
+	}
+}

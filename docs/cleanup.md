@@ -46,6 +46,11 @@ Each completed target is printed. A failure stops later targets and reports the
 pending operation and recovery command. If worktree removal succeeds but branch
 deletion fails, its mapping is removed and the branch step remains pending.
 Recovery never deletes a branch whose commit changed after intent was recorded.
+Schema v5 also records and rechecks the original Repo's Git administrative
+directory identity before every recovery step. Even a clone with the same branch
+name and commit at the old Repo path is refused. Pending cleanup created before
+v5 lacks this proof: inspect Git and use `recover --forget`, then review any
+remaining mapping and branch manually instead of replaying unverified intent.
 `--forget` abandons only intent; it never deletes files, mappings, or branches.
 Inspect `tasky list` afterwards and detach stale mappings if necessary.
 

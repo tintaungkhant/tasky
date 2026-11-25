@@ -79,7 +79,7 @@ the managed Task directory. An identical existing workspace file is retained;
 a differing existing file is preserved with an error asking you to move or
 preserve it before regeneration. Editor refresh improvements remain in #10.
 
-Schema migrations through version 4 are transactional and preserve IDs. Earlier
+Schema migrations through version 5 are transactional and preserve IDs. Earlier
 binaries reject the newer schema. Keep using the new binary for registered
 Tasks; old binaries cannot interpret the managed layout. YAML and adopted legacy
 worktrees remain usable independently, and ordinary Git use never depends on
