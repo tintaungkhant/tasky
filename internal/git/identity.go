@@ -48,5 +48,5 @@ func BranchRevision(repo, branch string) (string, error) {
 }
 
 func LocalChanges(path string) (string, error) {
-	return run(path, "status", "--porcelain=v1", "--untracked-files=all")
+	return run(path, "--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all")
 }
