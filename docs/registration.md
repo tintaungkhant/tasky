@@ -2,8 +2,9 @@
 
 The registration commands use SQLite. They do not import YAML configuration or
 change the existing `add`, `list`, `delete`, `vscode`, or `setup` workflows. Those
-commands still use YAML and legacy Task directories; adoption and integration
-are tracked in #4–#5. Registering a Repo alone does not make those commands use it.
+commands still use YAML and legacy Task directories; command integration is
+tracked in #5. Use [`tasky import`](adoption.md) to adopt legacy mappings.
+Registering a Repo alone does not make legacy commands use it.
 
 ```sh
 tasky root add company /work/company

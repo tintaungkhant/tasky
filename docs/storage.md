@@ -3,8 +3,9 @@
 `internal/store` provides persistent identities and associations for the CLI
 revamp. [Registration commands](registration.md) use it to manage Roots and Repos
 and resolve context. Existing Task commands continue to use YAML configuration
-and legacy Task directories. Legacy adoption and Task command integration are
-tracked in #4–#5. Registration does not import, move, or modify existing work.
+and legacy Task directories. [`tasky import`](adoption.md) adopts verified legacy
+mappings; Task command integration is tracked in #5. Registration does not
+import, move, or modify existing work.
 
 Call `store.Open(path)` with an explicit database filename, then close the Store
 when finished. Opening creates missing parent directories and initializes schema

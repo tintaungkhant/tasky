@@ -60,6 +60,52 @@ func PrimaryWorktree(dir string) (string, error) {
 	return path, nil
 }
 
+// VerifyWorktree requires an actual checkout root registered with Git. A
+// directory merely inside a checkout cannot be attached or imported.
+func VerifyWorktree(path string) (string, string, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", "", err
+	}
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", "", fmt.Errorf("worktree location: %w", err)
+	}
+	top, err := Toplevel(path)
+	if err != nil {
+		return "", "", err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", "", err
+	}
+	topInfo, err := os.Stat(top)
+	if err != nil || !os.SameFile(info, topInfo) {
+		return "", "", fmt.Errorf("%s is not a Git worktree root", path)
+	}
+	primary, err := PrimaryWorktree(path)
+	if err != nil {
+		return "", "", err
+	}
+	out, err := run(path, "worktree", "list", "--porcelain", "-z")
+	if err != nil {
+		return "", "", err
+	}
+	for _, record := range strings.Split(out, "\x00\x00") {
+		first, _, _ := strings.Cut(record, "\x00")
+		registered, ok := strings.CutPrefix(first, "worktree ")
+		if !ok {
+			continue
+		}
+		other, err := os.Stat(registered)
+		if err == nil && os.SameFile(info, other) {
+			primary, err = filepath.EvalSymlinks(primary)
+			return path, primary, err
+		}
+	}
+	return "", "", fmt.Errorf("%s is not registered with Git; inspect `git worktree list`", path)
+}
+
 // CurrentBranch returns the current branch name in the repo at dir.
 func CurrentBranch(dir string) (string, error) {
 	return run(dir, "branch", "--show-current")

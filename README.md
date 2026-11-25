@@ -53,6 +53,8 @@ tasky delete CRO-001 --delete-branch          # done: tear it all down
 The table below describes the legacy Task commands. The new
 [Root and Repo registration commands](docs/registration.md) support nested and
 external Repos in SQLite; Task command integration is still pending.
+Use [`tasky import`](docs/adoption.md) to adopt verified legacy configuration and
+Tasks without relocating work or modifying Git.
 
 | Term | Meaning |
 |------|---------|
