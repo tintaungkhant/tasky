@@ -13,7 +13,7 @@ A single Git repository living directly under a Root. Must contain `.git` — `t
 _Avoid_: Project, package
 
 **Task**:
-The unit of work a developer is doing (e.g. a Jira ticket), identified by its Task ID, that may span one or more Repos. All worktrees for a Task live together under `<tasks_dir>/<Task ID>/`.
+The unit of work a developer is doing (e.g. a Jira ticket), identified by its Task ID, that may span one or more Repos. All worktrees for a Task live together under `<tasks_dir>/<Task ID>[@<name>]/`.
 _Avoid_: Ticket, story
 
 **Task ID**:

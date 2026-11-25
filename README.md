@@ -157,8 +157,11 @@ Layout:
 cmd/              Cobra commands (add, list, vscode, delete, setup, completion)
 internal/config/  Config load/save and Root matching
 internal/git/     Thin wrappers over git commands
+internal/store/   SQLite identity and association foundation (command integration pending)
 internal/task/    Pure domain logic: branch rendering, task/worktree paths
 internal/ui/      Terminal styling
 ```
 
-Domain vocabulary is in [CONTEXT.md](CONTEXT.md).
+Domain vocabulary is in [docs/glossary.md](docs/glossary.md).
+The revamp's storage foundation and current integration boundary are described in
+[docs/storage.md](docs/storage.md).
