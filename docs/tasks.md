@@ -18,6 +18,9 @@ Unicode, spaces, and punctuation. `rename` changes only the name: the internal
 identity, branches, paths, and associations remain unchanged. An existing
 Task's name is retained when `add --name` is supplied again.
 
+Existing checkouts can be [attached, detached, or explicitly reassigned](associations.md)
+without changing Git or their paths.
+
 New checkouts use `<Tasks Directory>/.tasky/<internal Task ID>/<opaque ID>`.
 The managed `.tasky` namespace has a format marker and is excluded from legacy
 import. A pre-existing unmarked `.tasky` directory requires review or a different

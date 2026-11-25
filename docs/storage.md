@@ -26,7 +26,9 @@ internal ID. Queries use persisted IDs, never directory-name parsing.
 A Repo belongs to one Root. A worktree association links one Task to one Repo
 in that same Root. A Task can have several Repos and several worktrees from
 each Repo. A worktree path can have only one association across the database;
-conflicts are rejected without replacing existing records. Associations store
+conflicts are rejected without replacing existing records. The verified
+[`attach` flow](associations.md) supports transactional, explicit reassignment
+guarded by the expected source Task identity. Associations store
 no live branch or Git status. Pending creation records store the requested
 branch as operation intent, not as authoritative Git state.
 
