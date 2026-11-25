@@ -102,7 +102,11 @@ func (m Manager) Create(task store.Task, repo store.Repo, tasksDir, branch, base
 	if err := m.Verify(repo, path); err != nil {
 		return partial(err)
 	}
-	if err := m.Store.CompleteCreation(c.ID); err != nil {
+	identity, err := git.WorktreeIdentity(path)
+	if err != nil {
+		return partial(err)
+	}
+	if err := m.Store.CompleteCreation(c.ID, identity); err != nil {
 		return partial(err)
 	}
 	return path, nil
@@ -192,5 +196,9 @@ func (m Manager) Recover(c store.Creation, repo store.Repo) error {
 	if branch != c.Branch {
 		return fmt.Errorf("creation remains pending: expected branch %q, found %q; review before recovery", c.Branch, branch)
 	}
-	return m.Store.CompleteCreation(c.ID)
+	identity, err := git.WorktreeIdentity(c.Path)
+	if err != nil {
+		return err
+	}
+	return m.Store.CompleteCreation(c.ID, identity)
 }

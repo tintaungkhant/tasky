@@ -9,7 +9,11 @@ import (
 // Attach atomically creates a Task if needed and associates a verified checkout.
 // expectedSource is the internal Task identity required for reassignment. It
 // acts as a compare-and-swap guard against stale or competing requests.
-func (s *Store) Attach(rootID, publicID, name, repoID, path, expectedSource string) (Worktree, error) {
+func (s *Store) Attach(rootID, publicID, name, repoID, path, expectedSource string, identities ...string) (Worktree, error) {
+	identity := ""
+	if len(identities) > 0 {
+		identity = identities[0]
+	}
 	if publicID == "" {
 		return Worktree{}, fmt.Errorf("Task ID must not be empty")
 	}
@@ -44,11 +48,14 @@ func (s *Store) Attach(rootID, publicID, name, repoID, path, expectedSource stri
 		return Worktree{}, err
 	}
 	var current Worktree
-	err = tx.QueryRow("SELECT id, task_id, repo_id, path FROM worktrees WHERE path_key = ?", key).Scan(&current.ID, &current.TaskID, &current.RepoID, &current.Path)
+	err = tx.QueryRow("SELECT id, task_id, repo_id, path, identity FROM worktrees WHERE path_key = ?", key).Scan(&current.ID, &current.TaskID, &current.RepoID, &current.Path, &current.Identity)
 	if err != nil && err != sql.ErrNoRows {
 		return Worktree{}, err
 	}
 	exists := err == nil
+	if exists && identity != current.Identity {
+		return Worktree{}, fmt.Errorf("identity mismatch or unverified legacy mapping; use reconnect after reviewing the location: %w", ErrConflict)
+	}
 	if exists && current.TaskID == target && current.RepoID == repoID {
 		return current, nil
 	}
@@ -64,12 +71,12 @@ func (s *Store) Attach(rootID, publicID, name, repoID, path, expectedSource stri
 			return Worktree{}, writeError("attach Task", err)
 		}
 	}
-	wt := Worktree{ID: current.ID, TaskID: target, RepoID: repoID, Path: path}
+	wt := Worktree{ID: current.ID, TaskID: target, RepoID: repoID, Path: path, Identity: identity}
 	if exists {
 		_, err = tx.Exec("UPDATE worktrees SET root_id = ?, task_id = ?, repo_id = ?, path = ? WHERE id = ?", rootID, target, repoID, path, current.ID)
 	} else {
 		wt.ID = rand.Text()
-		_, err = tx.Exec("INSERT INTO worktrees(id, root_id, task_id, repo_id, path, path_key) VALUES(?, ?, ?, ?, ?, ?)", wt.ID, rootID, target, repoID, path, key)
+		_, err = tx.Exec("INSERT INTO worktrees(id, root_id, task_id, repo_id, path, path_key, identity) VALUES(?, ?, ?, ?, ?, ?, ?)", wt.ID, rootID, target, repoID, path, key, identity)
 	}
 	if err != nil {
 		return Worktree{}, writeError("attach", err)

@@ -368,13 +368,23 @@ func runStoredList(cmd *cobra.Command, args []string, c *storedContext) error {
 	}
 	for _, entry := range entries {
 		cmd.Println(entry.Label())
-		wts, _, _, err := c.worktrees(entry.ID)
+		wts, mappings, repos, err := c.worktrees(entry.ID)
 		if err != nil {
 			return err
 		}
 		for _, wt := range wts {
-			branch, _ := git.CurrentBranch(wt.Path)
-			cmd.Printf("  %s  %s  %s\n", wt.RepoName, branch, wt.Path)
+			mapping := mappings[wt.Path]
+			state := (work.Manager{Store: c.Store}).Inspect(repos[mapping.RepoID], mapping)
+			if state.Status != "ok" {
+				cmd.Printf("  %s  %s  [%s] %s\n", wt.RepoName, wt.Path, state.Status, state.Detail)
+				continue
+			}
+			cmd.Printf("  %s  %s  %s\n", wt.RepoName, state.Branch, wt.Path)
+			if state.Changes == "" {
+				cmd.Println("    clean")
+			} else {
+				cmd.Printf("    local changes:\n%s\n", state.Changes)
+			}
 		}
 	}
 	return nil

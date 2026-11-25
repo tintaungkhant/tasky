@@ -106,7 +106,11 @@ func Plan(cfg *config.Config) ([]store.ImportRoot, error) {
 					return nil, fmt.Errorf("review Task %q directory %s: %w", entry.ID, wt.Path, err)
 				}
 				addRepo(primary)
-				plannedTask.Worktrees = append(plannedTask.Worktrees, store.ImportWorktree{RepoPath: primary, Path: path})
+				identity, err := git.WorktreeIdentity(path)
+				if err != nil {
+					return nil, err
+				}
+				plannedTask.Worktrees = append(plannedTask.Worktrees, store.ImportWorktree{RepoPath: primary, Path: path, Identity: identity})
 			}
 			planned.Tasks = append(planned.Tasks, plannedTask)
 		}

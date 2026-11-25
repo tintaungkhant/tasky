@@ -41,7 +41,11 @@ func runAttach(cmd *cobra.Command, args []string) error {
 	}
 	name, _ := cmd.Flags().GetString("name")
 	from, _ := cmd.Flags().GetString("reassign-from")
-	wt, err := c.Store.Attach(c.Root.ID, args[0], name, ctx.Repo.ID, path, from)
+	identity, err := git.WorktreeIdentity(path)
+	if err != nil {
+		return err
+	}
+	wt, err := c.Store.Attach(c.Root.ID, args[0], name, ctx.Repo.ID, path, from, identity)
 	if err != nil {
 		return err
 	}

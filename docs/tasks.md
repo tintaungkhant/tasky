@@ -69,8 +69,9 @@ partial results, not automatically deleted data.
 Registered `list` and completion read metadata and persisted paths, never parse
 managed directory names. `delete` uses verified Git locations and removes the
 corresponding mapping only after Git succeeds. It preserves unrelated files and
-editor workspace files; a failure reports partial removal. Comprehensive live
-health reporting and cleanup refinements remain in #7–#8.
+editor workspace files; a failure reports partial removal. [Live inspection](inspection.md)
+checks worktree identity before showing branch and status. Cleanup refinements
+remain in #8.
 
 `vscode` includes mapped paths, including multiple checkouts per Repo. It keeps
 the original workspace location for an adopted Task and otherwise writes under
@@ -78,7 +79,7 @@ the managed Task directory. An identical existing workspace file is retained;
 a differing existing file is preserved with an error asking you to move or
 preserve it before regeneration. Editor refresh improvements remain in #10.
 
-Schema migration from version 1 to 2 is transactional and preserves IDs. Earlier
+Schema migrations through version 3 are transactional and preserve IDs. Earlier
 binaries reject the newer schema. Keep using the new binary for registered
 Tasks; old binaries cannot interpret the managed layout. YAML and adopted legacy
 worktrees remain usable independently, and ordinary Git use never depends on
