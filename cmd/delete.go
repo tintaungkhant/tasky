@@ -30,6 +30,8 @@ var deleteCmd = &cobra.Command{
 }
 
 func init() {
+	deleteCmd.Flags().Bool("force-worktree", false, "override dirty-worktree protection (registered Roots)")
+	deleteCmd.Flags().Bool("force-branch", false, "override unmerged-branch protection (registered Roots)")
 	deleteCmd.Flags().BoolVar(&deleteForceFlag, "force", false, "force-remove worktrees/branches with uncommitted or unmerged changes")
 	deleteCmd.Flags().BoolVar(&deleteDeleteBranchFlag, "delete-branch", false, "also delete each removed worktree's branch (non-interactive only)")
 	rootCmd.AddCommand(deleteCmd)

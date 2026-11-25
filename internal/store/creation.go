@@ -58,7 +58,7 @@ func (s *Store) ForgetWorktree(id string) error {
 }
 
 func (s *Store) RemoveEmptyTask(id string) error {
-	_, err := s.db.Exec("DELETE FROM tasks WHERE id = ? AND NOT EXISTS (SELECT 1 FROM worktrees WHERE task_id = ?) AND NOT EXISTS (SELECT 1 FROM creations WHERE task_id = ?)", id, id, id)
+	_, err := s.db.Exec("DELETE FROM tasks WHERE id = ? AND NOT EXISTS (SELECT 1 FROM worktrees WHERE task_id = ?) AND NOT EXISTS (SELECT 1 FROM creations WHERE task_id = ?) AND NOT EXISTS (SELECT 1 FROM cleanups WHERE task_id = ?)", id, id, id, id)
 	if err != nil {
 		return writeError("remove empty Task", err)
 	}

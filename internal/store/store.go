@@ -124,7 +124,12 @@ func (s *Store) initialize() error {
 		if _, err := tx.Exec("ALTER TABLE worktrees ADD COLUMN identity TEXT NOT NULL DEFAULT ''; CREATE UNIQUE INDEX worktrees_identity ON worktrees(identity) WHERE identity <> ''; PRAGMA user_version = 3;"); err != nil {
 			return err
 		}
+		fallthrough
 	case 3:
+		if _, err := tx.Exec(cleanupSchema); err != nil {
+			return err
+		}
+	case 4:
 	default:
 		return fmt.Errorf("unsupported schema version %d; use a compatible Tasky version", version)
 	}
@@ -141,6 +146,14 @@ func (s *Store) RemoveRoot(id string) error {
 		return writeError("remove Root", err)
 	}
 	defer tx.Rollback()
+	var pending string
+	err = tx.QueryRow("SELECT id FROM cleanups WHERE root_id = ? LIMIT 1", id).Scan(&pending)
+	if err == nil {
+		return fmt.Errorf("cleanup %s is pending; recover it or --forget its intent before removing the Root", pending)
+	}
+	if err != sql.ErrNoRows {
+		return err
+	}
 	for _, query := range []string{
 		"DELETE FROM creations WHERE root_id = ?",
 		"DELETE FROM worktrees WHERE root_id = ?",

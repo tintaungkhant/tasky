@@ -30,7 +30,7 @@ func storedExec(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	addFromFlag, addNameFlag, listAllFlag, deleteForceFlag, deleteDeleteBranchFlag = "", "", false, false, false
 	for _, cmd := range rootCmd.Commands() {
-		for _, name := range []string{"root", "repo", "as-is", "name", "reassign-from", "accept-identity"} {
+		for _, name := range []string{"root", "repo", "as-is", "name", "reassign-from", "accept-identity", "force-worktree", "force-branch", "forget"} {
 			if f := cmd.Flags().Lookup(name); f != nil {
 				_ = cmd.Flags().Set(name, f.DefValue)
 			}
@@ -38,7 +38,7 @@ func storedExec(t *testing.T, args ...string) (string, error) {
 	}
 	t.Cleanup(func() {
 		for _, cmd := range rootCmd.Commands() {
-			for _, name := range []string{"root", "repo", "as-is", "name", "reassign-from", "accept-identity"} {
+			for _, name := range []string{"root", "repo", "as-is", "name", "reassign-from", "accept-identity", "force-worktree", "force-branch", "forget"} {
 				if f := cmd.Flags().Lookup(name); f != nil {
 					_ = cmd.Flags().Set(name, f.DefValue)
 				}

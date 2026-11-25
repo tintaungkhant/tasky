@@ -9,9 +9,10 @@ not import, move, or modify existing work.
 
 Call `store.Open(path)` with an explicit database filename, then close the Store
 when finished. Opening creates missing parent directories and initializes schema
-version 3 in a transaction (upgrading older versions without changing IDs).
+version 4 in a transaction (upgrading older versions without changing IDs).
 Version 3 adds verified worktree identities; see [inspection](inspection.md)
 for explicit enrollment of mappings created by older versions.
+Version 4 adds [cleanup intent and recovery](cleanup.md).
 Registration commands open `tasky.sqlite3` beside the
 YAML configuration file. Unsupported schema versions and invalid databases
 return errors rather than being replaced.

@@ -36,7 +36,7 @@ func init() {
 		}
 		return c.Store.RenameTask(t.ID, args[1])
 	}}
-	pending := &cobra.Command{Use: "pending", Short: "List unfinished worktree creations", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	pending := &cobra.Command{Use: "pending", Short: "List unfinished worktree creations and cleanup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := requiredStored(cmd)
 		if err != nil {
 			return err
@@ -49,14 +49,49 @@ func init() {
 		for _, op := range operations {
 			cmd.Printf("%s\t%s\t%s\n", op.ID, op.Branch, op.Path)
 		}
+		cleanups, err := c.Store.ListCleanups(c.Root.ID)
+		if err != nil {
+			return err
+		}
+		for _, op := range cleanups {
+			cmd.Printf("%s\tcleanup\t%s\t%s\tworktree removed: %t; branch deletion requested: %t\n", op.ID, op.Branch, op.Path, op.Removed, op.DeleteBranch)
+		}
 		return nil
 	}}
-	recover := &cobra.Command{Use: "recover <operation-ID>", Short: "Record a verified pending checkout, or abandon its creation intent", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	recover := &cobra.Command{Use: "recover <operation-ID>", Short: "Recover a pending creation or cleanup, or abandon its intent", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := requiredStored(cmd)
 		if err != nil {
 			return err
 		}
 		defer c.Store.Close()
+		cleanups, err := c.Store.ListCleanups(c.Root.ID)
+		if err != nil {
+			return err
+		}
+		for _, op := range cleanups {
+			if op.ID != args[0] {
+				continue
+			}
+			forget, _ := cmd.Flags().GetBool("forget")
+			if forget {
+				return c.Store.ForgetCleanup(op.ID)
+			}
+			repos, err := c.Store.ListRepos(c.Root.ID)
+			if err != nil {
+				return err
+			}
+			for _, repo := range repos {
+				if repo.ID == op.RepoID {
+					fw, _ := cmd.Flags().GetBool("force-worktree")
+					fb, _ := cmd.Flags().GetBool("force-branch")
+					if err := (work.Manager{Store: c.Store}).RecoverCleanup(repo, op, fw, fb); err != nil {
+						return err
+					}
+					cmd.Printf("Cleanup %s completed.\n", op.ID)
+					return nil
+				}
+			}
+		}
 		operations, err := c.Store.ListCreations(c.Root.ID)
 		if err != nil {
 			return err
@@ -79,9 +114,11 @@ func init() {
 				}
 			}
 		}
-		return fmt.Errorf("pending creation %q not found; use `tasky pending`", args[0])
+		return fmt.Errorf("pending operation %q not found; use `tasky pending`", args[0])
 	}}
-	recover.Flags().Bool("forget", false, "forget creation intent only; preserve all files, worktrees, and branches")
+	recover.Flags().Bool("forget", false, "forget operation intent only; preserve all files, mappings, worktrees, and branches")
+	recover.Flags().Bool("force-worktree", false, "override dirty-worktree protection for pending cleanup")
+	recover.Flags().Bool("force-branch", false, "override unmerged-branch protection for pending cleanup")
 	for _, cmd := range []*cobra.Command{addCmd, listCmd, deleteCmd, vscodeCmd, rename, pending, recover} {
 		cmd.Flags().String("root", "", "registered Root name or ID (default: current-directory context)")
 	}

@@ -26,6 +26,9 @@ func (s *Store) Attach(rootID, publicID, name, repoID, path, expectedSource stri
 		return Worktree{}, writeError("attach", err)
 	}
 	defer tx.Rollback()
+	if err := cleanupReserved(tx, key); err != nil {
+		return Worktree{}, err
+	}
 	var validRepo string
 	err = tx.QueryRow("SELECT id FROM repos WHERE id = ? AND root_id = ?", repoID, rootID).Scan(&validRepo)
 	if err == sql.ErrNoRows {
@@ -99,6 +102,9 @@ func (s *Store) Detach(rootID, publicID, path string) error {
 		return writeError("detach", err)
 	}
 	defer tx.Rollback()
+	if err := cleanupReserved(tx, key); err != nil {
+		return err
+	}
 	var target string
 	err = tx.QueryRow("SELECT id FROM tasks WHERE root_id = ? AND task_id = ?", rootID, publicID).Scan(&target)
 	if err == sql.ErrNoRows {
