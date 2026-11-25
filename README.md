@@ -57,6 +57,8 @@ The table and directory example describe the legacy layout. After
 use `<tasks_dir>/.tasky/<internal Task ID>/<opaque ID>`, and Task names are
 independent of paths. Nested and external Repos are supported. Adoption preserves
 existing locations and Git state.
+Use [`attach` and `detach`](docs/associations.md) to organize existing checkouts;
+reassignment requires an explicit source Task identity.
 
 | Term | Meaning |
 |------|---------|

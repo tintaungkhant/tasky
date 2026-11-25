@@ -63,6 +63,9 @@ func PrimaryWorktree(dir string) (string, error) {
 // VerifyWorktree requires an actual checkout root registered with Git. A
 // directory merely inside a checkout cannot be attached or imported.
 func VerifyWorktree(path string) (string, string, error) {
+	if path == "" {
+		return "", "", fmt.Errorf("worktree path must not be empty")
+	}
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return "", "", err
