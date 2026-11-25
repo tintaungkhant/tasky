@@ -8,3 +8,4 @@ Docs describing how the project works now. Keep them true: see `.ai/rules/docs.m
 - `associations.md`: attach, detach, and explicit reassignment of existing checkouts.
 - `inspection.md`: live Git state, location diagnostics, and safe reconnection.
 - `cleanup.md`: explicit cleanup effects, protections, and interrupted-operation recovery.
+- `backup.md`: consistent mapping backups, atomic restore, and database recovery.

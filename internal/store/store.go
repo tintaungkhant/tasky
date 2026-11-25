@@ -69,7 +69,12 @@ PRAGMA user_version = 1;
 
 // Open creates the database and parent directory if needed. Every connection
 // enforces foreign keys and waits up to five seconds for another writer.
-func Open(path string) (*Store, error) {
+func Open(path string) (_ *Store, openErr error) {
+	defer func() {
+		if openErr != nil {
+			openErr = fmt.Errorf("Tasky database %s is unavailable: %w; check the path, permissions, disk space, and Tasky version; preserve the database before restoring a backup. Ordinary Git commands remain usable", path, openErr)
+		}
+	}()
 	path, _, err := location(path)
 	if err != nil {
 		return nil, err

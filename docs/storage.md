@@ -56,3 +56,7 @@ Retrying a rejected write cannot overwrite the existing association. SQLite
 transactions do not include Git operations; callers combining Git and storage
 must report partial completion and provide recovery rather than assuming both
 changes are atomic. Direct Git use remains independent of this database.
+
+[`backup` and `restore`](backup.md) export a consistent, versioned logical
+snapshot and merge it atomically without replacing existing mappings. Pending
+creation and cleanup operations must be resolved first.
