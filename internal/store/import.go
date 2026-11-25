@@ -18,7 +18,7 @@ type ImportTask struct {
 	TaskID, Name string
 	Worktrees    []ImportWorktree
 }
-type ImportWorktree struct{ RepoPath, Path string }
+type ImportWorktree struct{ RepoPath, Path, Identity string }
 
 func (s *Store) Import(roots []ImportRoot) error {
 	tx, err := s.db.Begin()
@@ -82,7 +82,7 @@ func (s *Store) Import(roots []ImportRoot) error {
 				if err != sql.ErrNoRows {
 					return err
 				}
-				if _, err := tx.Exec("INSERT INTO worktrees(id, root_id, task_id, repo_id, path, path_key) VALUES(?, ?, ?, ?, ?, ?)", rand.Text(), rootID, id, repoID, path, key); err != nil {
+				if _, err := tx.Exec("INSERT INTO worktrees(id, root_id, task_id, repo_id, path, path_key, identity) VALUES(?, ?, ?, ?, ?, ?, ?)", rand.Text(), rootID, id, repoID, path, key, wt.Identity); err != nil {
 					return writeError("import worktree", err)
 				}
 			}

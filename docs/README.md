@@ -6,3 +6,4 @@ Docs describing how the project works now. Keep them true: see `.ai/rules/docs.m
 - `adoption.md`: verified, repeatable legacy import and its compatibility boundary.
 - `tasks.md`: registered Task creation, naming, readers, and pending-operation recovery.
 - `associations.md`: attach, detach, and explicit reassignment of existing checkouts.
+- `inspection.md`: live Git state, location diagnostics, and safe reconnection.

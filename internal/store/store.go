@@ -27,7 +27,7 @@ type Store struct{ db *sql.DB }
 type Root struct{ ID, Name, Path string }
 type Repo struct{ ID, RootID, Name, Path string }
 type Task struct{ ID, RootID, TaskID, Name string }
-type Worktree struct{ ID, TaskID, RepoID, Path string }
+type Worktree struct{ ID, TaskID, RepoID, Path, Identity string }
 
 const schema = `
 CREATE TABLE roots (
@@ -119,7 +119,12 @@ func (s *Store) initialize() error {
 		if _, err := tx.Exec(creationSchema); err != nil {
 			return err
 		}
+		fallthrough
 	case 2:
+		if _, err := tx.Exec("ALTER TABLE worktrees ADD COLUMN identity TEXT NOT NULL DEFAULT ''; CREATE UNIQUE INDEX worktrees_identity ON worktrees(identity) WHERE identity <> ''; PRAGMA user_version = 3;"); err != nil {
+			return err
+		}
+	case 3:
 	default:
 		return fmt.Errorf("unsupported schema version %d; use a compatible Tasky version", version)
 	}
@@ -277,7 +282,7 @@ func (s *Store) ListTasks(rootID string) ([]Task, error) {
 }
 
 func (s *Store) ListWorktrees(taskID string) ([]Worktree, error) {
-	rows, err := s.db.Query("SELECT id, task_id, repo_id, path FROM worktrees WHERE task_id = ? ORDER BY path", taskID)
+	rows, err := s.db.Query("SELECT id, task_id, repo_id, path, identity FROM worktrees WHERE task_id = ? ORDER BY path", taskID)
 	if err != nil {
 		return nil, fmt.Errorf("list worktrees: %w", err)
 	}
@@ -285,7 +290,7 @@ func (s *Store) ListWorktrees(taskID string) ([]Worktree, error) {
 	var worktrees []Worktree
 	for rows.Next() {
 		var wt Worktree
-		if err := rows.Scan(&wt.ID, &wt.TaskID, &wt.RepoID, &wt.Path); err != nil {
+		if err := rows.Scan(&wt.ID, &wt.TaskID, &wt.RepoID, &wt.Path, &wt.Identity); err != nil {
 			return nil, fmt.Errorf("read worktree: %w", err)
 		}
 		worktrees = append(worktrees, wt)

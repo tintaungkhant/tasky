@@ -105,14 +105,18 @@ func (s *Store) ListCreations(rootID string) ([]Creation, error) {
 }
 
 // CompleteCreation atomically exchanges a verified intent for an association.
-func (s *Store) CompleteCreation(id string) error {
+func (s *Store) CompleteCreation(id string, identities ...string) error {
+	identity := ""
+	if len(identities) > 0 {
+		identity = identities[0]
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return writeError("complete creation", err)
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec(`INSERT INTO worktrees(id, root_id, task_id, repo_id, path, path_key)
- SELECT id, root_id, task_id, repo_id, path, path_key FROM creations WHERE id = ?`, id)
+	result, err := tx.Exec(`INSERT INTO worktrees(id, root_id, task_id, repo_id, path, path_key, identity)
+ SELECT id, root_id, task_id, repo_id, path, path_key, ? FROM creations WHERE id = ?`, identity, id)
 	if err := changed("complete creation", result, err); err != nil {
 		return err
 	}
