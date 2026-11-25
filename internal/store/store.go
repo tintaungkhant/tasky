@@ -123,6 +123,40 @@ func (s *Store) initialize() error {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// RemoveRoot forgets a Root and its mappings in one transaction. It never
+// touches the filesystem or Git; callers must make the mapping loss explicit.
+func (s *Store) RemoveRoot(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return writeError("remove Root", err)
+	}
+	defer tx.Rollback()
+	for _, query := range []string{
+		"DELETE FROM worktrees WHERE root_id = ?",
+		"DELETE FROM tasks WHERE root_id = ?",
+		"DELETE FROM repos WHERE root_id = ?",
+	} {
+		if _, err := tx.Exec(query, id); err != nil {
+			return writeError("remove Root", err)
+		}
+	}
+	result, err := tx.Exec("DELETE FROM roots WHERE id = ?", id)
+	if err != nil {
+		return writeError("remove Root", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("remove Root: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("remove Root: %w", ErrNotFound)
+	}
+	if err := tx.Commit(); err != nil {
+		return writeError("remove Root", err)
+	}
+	return nil
+}
+
 func (s *Store) ListRoots() ([]Root, error) {
 	rows, err := s.db.Query("SELECT id, name, path FROM roots ORDER BY name, id")
 	if err != nil {

@@ -50,6 +50,10 @@ tasky delete CRO-001 --delete-branch          # done: tear it all down
 
 ## Concepts
 
+The table below describes the legacy Task commands. The new
+[Root and Repo registration commands](docs/registration.md) support nested and
+external Repos in SQLite; Task command integration is still pending.
+
 | Term | Meaning |
 |------|---------|
 | **Root** | A top-level directory (e.g. `~/Work/company`) holding one or more repos. tasky picks the Root containing your current directory by longest path-prefix match. |
@@ -78,7 +82,9 @@ When adding a Root, `tasks_dir` defaults to `<path>/tasks` and `branch_template`
 
 ## Commands
 
-All commands except `setup` must be run from inside a configured Root (in a repo or the Root directory itself).
+The legacy Task commands below must be run from inside a YAML-configured Root
+(in a repo or the Root directory itself). The new `root`, `repo`, and `context`
+commands support [registration and explicit context selection](docs/registration.md).
 
 ### `tasky add [repo] <task-id> <branch>`
 
