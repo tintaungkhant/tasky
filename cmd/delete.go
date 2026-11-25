@@ -36,6 +36,12 @@ func init() {
 }
 
 func runDelete(cmd *cobra.Command, args []string) error {
+	if c, err := registeredContext(cmd); err != nil {
+		return err
+	} else if c != nil {
+		defer c.Store.Close()
+		return runStoredDelete(cmd, args, c)
+	}
 	interactive := len(args) == 0
 
 	var taskID, repoArg, branchArg string

@@ -20,13 +20,14 @@ failure rolls back the entire transaction. SQLite also rolls back an interrupted
 transaction. Retry after fixing the reported problem. Import never overwrites
 an existing name or reassigns a worktree to a different Task.
 
-During this migration stage, existing `add`, `list`, `delete`, `vscode`, and shell
-completion continue to use the unchanged YAML and legacy directories. Import
-does not remove that compatibility path. Legacy commands can still modify Git
-and directories; import only adds verified mappings, never removes missing ones.
-SQLite-backed creation and readers are introduced in #5. Avoid mixing old and
-new binaries once Task names become independent of directory names.
+After import, existing commands use [persisted identities and paths](tasks.md).
+Unadopted YAML Roots retain their legacy workflow. The marked managed `.tasky`
+directory is excluded from import, so new managed checkouts are not interpreted
+as legacy Tasks. Import never removes missing mappings or overwrites names;
+renaming an adopted Task can therefore require review before a later import.
 
-Rollback at this stage is to continue using the legacy CLI and YAML; neither
-depends on the imported database. Preserve the database if any mappings should
-be retained. Import is not a filesystem or Git backup.
+YAML and adopted paths remain unchanged. Older binaries can still use the
+original legacy layout, but cannot interpret newly created managed checkouts or
+renamed Task metadata. Avoid mixing binary versions after adoption. Preserve the
+database to retain new identities and associations; import is not a filesystem
+or Git backup and cannot reconstruct forgotten managed mappings.

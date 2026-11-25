@@ -49,6 +49,12 @@ type vscodeFolder struct {
 }
 
 func runVSCode(cmd *cobra.Command, args []string) error {
+	if c, err := registeredContext(cmd); err != nil {
+		return err
+	} else if c != nil {
+		defer c.Store.Close()
+		return runStoredVSCode(cmd, args, c)
+	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)

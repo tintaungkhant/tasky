@@ -13,11 +13,11 @@ A single Git repository registered with a Root, identified through Git across it
 _Avoid_: Project, package
 
 **Task**:
-The unit of work a developer is doing (e.g. a Jira ticket), identified by its Task ID, that may span one or more Repos. All worktrees for a Task live together under `<tasks_dir>/<Task ID>[@<name>]/`.
+The unit of work a developer is doing, with a persisted internal identity and a Root-scoped Task ID. It can span multiple Repos and multiple worktrees per Repo. Its optional name is independent of branches and filesystem paths. New worktrees use an opaque managed layout; adopted worktrees keep their original paths. See [tasks.md](tasks.md).
 _Avoid_: Ticket, story
 
 **Task ID**:
-A single literal string the developer supplies to name a Task (e.g. `CRO-001-payment`). Used verbatim in two places: as the Task's folder name under the Tasks Directory, and substituted into `{task-id}` in the Branch Template. Never truncated, parsed, or derived — if a developer wants a short branch name and a descriptive folder, they must type a short Task ID themselves.
+A literal string the developer supplies to identify a Task within a Root (e.g. `CRO-001-payment`). Stored separately from the opaque internal identity and optional name, and substituted into `{task-id}` verbatim. Different Roots may reuse a Task ID. Only the legacy workflow uses Task IDs in directory names.
 _Avoid_: Ticket ID, task slug
 
 **Tasks Directory**:
