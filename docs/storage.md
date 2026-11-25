@@ -2,14 +2,15 @@
 
 `internal/store` provides persistent identities and associations for the CLI
 revamp. [Registration commands](registration.md) use it to manage Roots and Repos
-and resolve context. Existing Task commands continue to use YAML configuration
-and legacy Task directories. [`tasky import`](adoption.md) adopts verified legacy
-mappings; Task command integration is tracked in #5. Registration does not
-import, move, or modify existing work.
+and resolve context. [Task commands](tasks.md) use persisted mappings for
+registered Roots; unadopted YAML Roots retain the legacy workflow.
+[`tasky import`](adoption.md) adopts verified legacy mappings. Registration does
+not import, move, or modify existing work.
 
 Call `store.Open(path)` with an explicit database filename, then close the Store
 when finished. Opening creates missing parent directories and initializes schema
-version 1 in a transaction. Registration commands open `tasky.sqlite3` beside the
+version 2 in a transaction (upgrading version 1 without changing IDs).
+Registration commands open `tasky.sqlite3` beside the
 YAML configuration file. Unsupported schema versions and invalid databases
 return errors rather than being replaced.
 The pure-Go `modernc.org/sqlite` driver avoids a C compiler requirement.
@@ -25,8 +26,9 @@ internal ID. Queries use persisted IDs, never directory-name parsing.
 A Repo belongs to one Root. A worktree association links one Task to one Repo
 in that same Root. A Task can have several Repos and several worktrees from
 each Repo. A worktree path can have only one association across the database;
-conflicts are rejected without replacing existing records. No branches or live
-Git status are stored.
+conflicts are rejected without replacing existing records. Associations store
+no live branch or Git status. Pending creation records store the requested
+branch as operation intent, not as authoritative Git state.
 
 Locations are stored as absolute, cleaned paths. Comparison keys ignore letter
 case on Windows. The storage layer does not resolve filesystem aliases or check

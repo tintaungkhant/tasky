@@ -12,6 +12,7 @@ import (
 	"github.com/tintaungkhant/tasky/internal/git"
 	"github.com/tintaungkhant/tasky/internal/store"
 	"github.com/tintaungkhant/tasky/internal/task"
+	"github.com/tintaungkhant/tasky/internal/work"
 )
 
 func canonical(path string) (string, error) {
@@ -87,6 +88,9 @@ func Plan(cfg *config.Config) ([]store.ImportRoot, error) {
 		}
 		seenTasks := make(map[string]bool)
 		for _, entry := range taskEntries {
+			if entry.ID == ".tasky" && entry.Name == "" && work.IsManagedDirectory(filepath.Join(root.TasksDir, ".tasky")) {
+				continue
+			}
 			if entry.ID == "" || seenTasks[entry.ID] || strings.Count(task.TaskDirName(entry.ID, entry.Name), "@") > 1 {
 				return nil, fmt.Errorf("ambiguous legacy Task %q; review its ID and name before import", entry.Label())
 			}

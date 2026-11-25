@@ -45,6 +45,12 @@ func init() {
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
+	if c, err := registeredContext(cmd); err != nil {
+		return err
+	} else if c != nil {
+		defer c.Store.Close()
+		return runStoredAdd(cmd, args, c)
+	}
 	interactive := len(args) == 0
 
 	var repoArg, taskID, branch string
@@ -137,6 +143,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		renderedBranch = task.RenderBranch(root.BranchTemplate, taskID, taskName, branch)
 	}
 	worktreePath := task.WorktreePath(root.TasksDir, taskDirName, repoName, renderedBranch)
+	if taskDirName == "." || taskDirName == ".." || strings.ContainsAny(taskDirName, "/\\") {
+		return fmt.Errorf("legacy Task names must be one directory component; run `tasky import` to use names independent of paths")
+	}
+	if err := git.ValidateBranch(repoRoot, renderedBranch); err != nil {
+		return err
+	}
+	if info, err := os.Lstat(filepath.Join(root.TasksDir, taskDirName)); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("legacy Task directory is a symbolic link; review it before creation")
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
 
 	if _, err := os.Stat(worktreePath); err == nil {
 		return fmt.Errorf("worktree path already exists: %s", worktreePath)

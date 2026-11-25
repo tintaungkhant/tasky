@@ -70,6 +70,16 @@ func completeTaskID(cmd *cobra.Command, args []string, toComplete string) ([]str
 	if len(args) != 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
+	if c, err := registeredContext(cmd); err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	} else if c != nil {
+		defer c.Store.Close()
+		entries, err := c.entries()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return filterPrefix(taskIDs(entries), toComplete), cobra.ShellCompDirectiveNoFileComp
+	}
 	_, entries, ok := currentRootTaskEntries()
 	if !ok {
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -80,6 +90,37 @@ func completeTaskID(cmd *cobra.Command, args []string, toComplete string) ([]str
 // completeDeleteArgs completes delete's <task-id> [repo] [branch] positional
 // arguments, each narrowed by what's already been typed.
 func completeDeleteArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if c, err := registeredContext(cmd); err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	} else if c != nil {
+		defer c.Store.Close()
+		entries, err := c.entries()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if len(args) == 0 {
+			return filterPrefix(taskIDs(entries), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}
+		wts, _, _, err := c.worktrees(args[0])
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		var candidates []string
+		seen := make(map[string]bool)
+		for _, wt := range wts {
+			candidate := ""
+			if len(args) == 1 {
+				candidate = wt.RepoName
+			} else if len(args) == 2 && wt.RepoName == args[1] {
+				candidate, _ = git.CurrentBranch(wt.Path)
+			}
+			if candidate != "" && !seen[candidate] {
+				candidates = append(candidates, candidate)
+				seen[candidate] = true
+			}
+		}
+		return filterPrefix(candidates, toComplete), cobra.ShellCompDirectiveNoFileComp
+	}
 	root, entries, ok := currentRootTaskEntries()
 	if !ok {
 		return nil, cobra.ShellCompDirectiveNoFileComp

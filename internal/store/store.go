@@ -114,7 +114,12 @@ func (s *Store) initialize() error {
 		if _, err := tx.Exec(schema); err != nil {
 			return err
 		}
+		fallthrough
 	case 1:
+		if _, err := tx.Exec(creationSchema); err != nil {
+			return err
+		}
+	case 2:
 	default:
 		return fmt.Errorf("unsupported schema version %d; use a compatible Tasky version", version)
 	}
@@ -132,6 +137,7 @@ func (s *Store) RemoveRoot(id string) error {
 	}
 	defer tx.Rollback()
 	for _, query := range []string{
+		"DELETE FROM creations WHERE root_id = ?",
 		"DELETE FROM worktrees WHERE root_id = ?",
 		"DELETE FROM tasks WHERE root_id = ?",
 		"DELETE FROM repos WHERE root_id = ?",

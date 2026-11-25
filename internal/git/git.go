@@ -111,15 +111,20 @@ func CurrentBranch(dir string) (string, error) {
 	return run(dir, "branch", "--show-current")
 }
 
+func ValidateBranch(dir, branch string) error {
+	_, err := run(dir, "check-ref-format", "--branch", branch)
+	return err
+}
+
 // WorktreeAddNewBranch creates a worktree at path on a new branch, based on base.
 func WorktreeAddNewBranch(repoDir, path, branch, base string) error {
-	_, err := run(repoDir, "worktree", "add", "-b", branch, path, base)
+	_, err := run(repoDir, "worktree", "add", "-b", branch, "--", path, base)
 	return err
 }
 
 // WorktreeAddExistingBranch creates a worktree at path checking out the existing branch.
 func WorktreeAddExistingBranch(repoDir, path, branch string) error {
-	_, err := run(repoDir, "worktree", "add", path, branch)
+	_, err := run(repoDir, "worktree", "add", "--", path, branch)
 	return err
 }
 

@@ -41,6 +41,7 @@ go build -o tasky .
 
 ```sh
 tasky setup                                   # configure a Root once
+tasky import                                  # adopt YAML and any legacy Tasks
 cd ~/Work/company/api
 tasky add CRO-001 fix-refund --name refunds   # create worktree for this repo
 tasky add web CRO-001 refund-ui               # same task, another repo
@@ -50,11 +51,12 @@ tasky delete CRO-001 --delete-branch          # done: tear it all down
 
 ## Concepts
 
-The table below describes the legacy Task commands. The new
-[Root and Repo registration commands](docs/registration.md) support nested and
-external Repos in SQLite; Task command integration is still pending.
-Use [`tasky import`](docs/adoption.md) to adopt verified legacy configuration and
-Tasks without relocating work or modifying Git.
+The table and directory example describe the legacy layout. After
+[`tasky import`](docs/adoption.md) or [registration](docs/registration.md),
+[Task commands](docs/tasks.md) use SQLite identity and mappings. New worktrees
+use `<tasks_dir>/.tasky/<internal Task ID>/<opaque ID>`, and Task names are
+independent of paths. Nested and external Repos are supported. Adoption preserves
+existing locations and Git state.
 
 | Term | Meaning |
 |------|---------|
@@ -87,6 +89,9 @@ When adding a Root, `tasks_dir` defaults to `<path>/tasks` and `branch_template`
 The legacy Task commands below must be run from inside a YAML-configured Root
 (in a repo or the Root directory itself). The new `root`, `repo`, and `context`
 commands support [registration and explicit context selection](docs/registration.md).
+For registered Roots, see [Task workflows](docs/tasks.md) for `--root`, `--repo`,
+`--as-is`, `rename`, and creation recovery. Existing workspace files are preserved
+if regeneration would change their contents.
 
 ### `tasky add [repo] <task-id> <branch>`
 
