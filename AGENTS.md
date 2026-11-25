@@ -38,6 +38,16 @@ Settled decisions. Do not reopen one unless the user does. When a decision chang
 - A missing `tasks_dir` is created automatically.
 - `internal/git` tests run against real temp repos (`t.TempDir()` + `git init`), no exec mocking. Interactive `huh` prompt paths are not unit tested.
 
+Approved revamp direction (2026-11-25; implementation in progress):
+
+- [Tasky CLI Revamp spec #1](https://github.com/tintaungkhant/tasky/issues/1) defines the accepted scope and acceptance criteria.
+- Revamp the CLI first; GUI and local web server come later. No additional Workspace grouping layer.
+- Each Task belongs to one Root and supports multiple Repos and multiple worktrees per Repo.
+- SQLite owns Task identity and mappings independently of names and paths; Git remains authoritative for branch and worktree state.
+- Preserve existing Git workflows and allow users to stop using Tasky without losing code, branches, or worktrees.
+
+The SQLite storage foundation is implemented; CLI integration is pending. See [docs/storage.md](docs/storage.md) for the current integration boundary.
+
 ### Out of scope
 
 Features deliberately left out or removed. Do not add them back without asking.
