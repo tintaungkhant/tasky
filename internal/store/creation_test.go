@@ -27,7 +27,7 @@ func TestVersionOneMigratesWithoutChangingIdentity(t *testing.T) {
 		t.Fatalf("migration changed Root: %+v %v", roots, err)
 	}
 	var version int
-	if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
+	if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 4 {
 		t.Fatalf("version %d %v", version, err)
 	}
 	if _, err := s.ListCreations("stable"); err != nil {

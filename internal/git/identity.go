@@ -3,6 +3,7 @@ package git
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 // WorktreeIdentity identifies Git's administrative directory, which survives
@@ -25,6 +26,25 @@ func WorktreeIdentity(path string) (string, error) {
 		return "", fmt.Errorf("identify Git registration: %w", err)
 	}
 	return id, nil
+}
+
+func WorktreePaths(repo string) ([]string, error) {
+	out, err := run(repo, "worktree", "list", "--porcelain", "-z")
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, record := range strings.Split(out, "\x00\x00") {
+		first, _, _ := strings.Cut(record, "\x00")
+		if path, ok := strings.CutPrefix(first, "worktree "); ok {
+			paths = append(paths, path)
+		}
+	}
+	return paths, nil
+}
+
+func BranchRevision(repo, branch string) (string, error) {
+	return run(repo, "rev-parse", "--verify", "refs/heads/"+branch)
 }
 
 func LocalChanges(path string) (string, error) {

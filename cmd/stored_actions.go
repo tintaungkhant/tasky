@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/tintaungkhant/tasky/internal/git"
 	"github.com/tintaungkhant/tasky/internal/task"
 	"github.com/tintaungkhant/tasky/internal/work"
 )
@@ -64,32 +63,19 @@ func runStoredDelete(cmd *cobra.Command, args []string, c *storedContext) error 
 	for _, wt := range targets {
 		mapping := byPath[wt.Path]
 		repo := repos[mapping.RepoID]
-		if err := m.Verify(repo, wt.Path); err != nil {
-			return fmt.Errorf("refusing removal of unverified location %s: %w", wt.Path, err)
-		}
-		branch, err := git.CurrentBranch(wt.Path)
-		if err != nil {
-			return err
-		}
-		if err := git.WorktreeRemove(repo.Path, wt.Path, deleteForceFlag); err != nil {
-			return fmt.Errorf("earlier removals, if printed, succeeded; %w", err)
-		}
-		if err := c.Store.ForgetWorktree(mapping.ID); err != nil {
-			return fmt.Errorf("Git removed %s but its mapping remains; detach the stale mapping after reviewing Git: %w", wt.Path, err)
-		}
-		cmd.Printf("Removed worktree %s\n", wt.Path)
 		removeBranch := deleteDeleteBranchFlag
-		if len(args) == 0 && branch != "" {
-			removeBranch, err = promptConfirmDefault(fmt.Sprintf("Delete branch %q too?", branch), false)
+		if len(args) == 0 {
+			removeBranch, err = promptConfirmDefault(fmt.Sprintf("Delete the branch of %s too?", wt.Path), false)
 			if err != nil {
 				return err
 			}
 		}
-		if removeBranch && branch != "" {
-			if err := git.DeleteBranch(repo.Path, branch, deleteForceFlag); err != nil {
-				return fmt.Errorf("worktree and mapping removed; branch %q remains: %w", branch, err)
-			}
+		forceWorktree, _ := cmd.Flags().GetBool("force-worktree")
+		forceBranch, _ := cmd.Flags().GetBool("force-branch")
+		if err := m.Remove(repo, mapping, removeBranch, deleteForceFlag || forceWorktree, deleteForceFlag || forceBranch); err != nil {
+			return fmt.Errorf("earlier removals printed above completed; this and later targets may remain associated; %w", err)
 		}
+		cmd.Printf("Removed worktree and mapping %s (branch deletion requested: %t)\n", wt.Path, removeBranch)
 		// Only remove an empty parent. Workspace files and unrelated files remain.
 		parent := filepath.Dir(wt.Path)
 		owned := work.TaskDirectory(c.Config.TasksDir, t.ID)
