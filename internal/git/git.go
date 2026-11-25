@@ -33,6 +33,33 @@ func Toplevel(dir string) (string, error) {
 	return run(dir, "rev-parse", "--show-toplevel")
 }
 
+// CommonDir identifies the Git repository shared by all its worktrees.
+func CommonDir(dir string) (string, error) {
+	return run(dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+}
+
+// PrimaryWorktree returns the main checkout, including when dir is a linked
+// worktree. Bare repositories have no checkout and cannot be registered.
+func PrimaryWorktree(dir string) (string, error) {
+	if _, err := Toplevel(dir); err != nil {
+		return "", err
+	}
+	out, err := run(dir, "worktree", "list", "--porcelain", "-z")
+	if err != nil {
+		return "", err
+	}
+	record, _, _ := strings.Cut(out, "\x00\x00")
+	if strings.Contains(record, "\x00bare") {
+		return "", fmt.Errorf("cannot register a bare Repo; use a Repo with a primary checkout")
+	}
+	first, _, _ := strings.Cut(record, "\x00")
+	path, ok := strings.CutPrefix(first, "worktree ")
+	if !ok || path == "" {
+		return "", fmt.Errorf("cannot locate primary worktree; inspect `git worktree list`")
+	}
+	return path, nil
+}
+
 // CurrentBranch returns the current branch name in the repo at dir.
 func CurrentBranch(dir string) (string, error) {
 	return run(dir, "branch", "--show-current")

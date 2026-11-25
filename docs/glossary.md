@@ -5,11 +5,11 @@ Task-oriented CLI on top of Git worktrees — turns a task, a repo, and a branch
 ## Language
 
 **Root**:
-A configured top-level directory (e.g. `~/Work/company`) containing one or more repos and a Tasks Directory. `tasky` picks the Root that contains the current repo by longest matching path prefix.
+A configured directory (e.g. `~/Work/company`) that groups Repos and Tasks. Registered Repos may be nested inside it or live elsewhere. Registration context uses Repo membership first and otherwise requires exactly one containing Root. Legacy Task commands still use YAML and longest path-prefix matching; see [registration.md](registration.md).
 _Avoid_: Workspace, project group
 
 **Repo**:
-A single Git repository living directly under a Root. Must contain `.git` — `tasky` validates this before acting on a repo, whether it's cwd-detected, passed as an arg, or picked from a prompt.
+A single Git repository registered with a Root, identified through Git across its primary and linked worktrees. Registration imposes no directory layout. Legacy Task commands still discover Repos directly under a YAML Root.
 _Avoid_: Project, package
 
 **Task**:

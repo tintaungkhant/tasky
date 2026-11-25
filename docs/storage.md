@@ -1,15 +1,16 @@
-# SQLite storage foundation
+# SQLite storage
 
 `internal/store` provides persistent identities and associations for the CLI
-revamp. It is a storage API, not yet connected to commands. Existing commands
-continue to use YAML configuration and legacy Task directories. Registration,
-legacy adoption, and command integration are tracked in issues #3–#5; this
-foundation does not import, move, or modify existing work.
+revamp. [Registration commands](registration.md) use it to manage Roots and Repos
+and resolve context. Existing Task commands continue to use YAML configuration
+and legacy Task directories. Legacy adoption and Task command integration are
+tracked in #4–#5. Registration does not import, move, or modify existing work.
 
 Call `store.Open(path)` with an explicit database filename, then close the Store
 when finished. Opening creates missing parent directories and initializes schema
-version 1 in a transaction. There is no default database location yet. Unsupported
-schema versions and invalid databases return errors rather than being replaced.
+version 1 in a transaction. Registration commands open `tasky.sqlite3` beside the
+YAML configuration file. Unsupported schema versions and invalid databases
+return errors rather than being replaced.
 The pure-Go `modernc.org/sqlite` driver avoids a C compiler requirement.
 
 ## Identity and associations
@@ -35,7 +36,8 @@ original worktree. Missing paths do not delete persisted identities.
 ## Writes and recovery
 
 SQLite constraints enforce uniqueness and same-Root references. Each creation
-or association is one atomic statement. Every connection enables foreign keys
+or association is one atomic statement. Root removal deletes its mappings in
+one transaction. Every connection enables foreign keys
 and waits up to five seconds for a competing writer. Schema initialization uses
 an immediate transaction so concurrent opens cannot partially initialize it.
 `ErrConflict` and `ErrNotFound` distinguish conflicting records from invalid
