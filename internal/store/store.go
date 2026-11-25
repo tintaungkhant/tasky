@@ -134,7 +134,12 @@ func (s *Store) initialize() error {
 		if _, err := tx.Exec(cleanupSchema); err != nil {
 			return err
 		}
+		fallthrough
 	case 4:
+		if _, err := tx.Exec("ALTER TABLE cleanups ADD COLUMN repo_identity TEXT NOT NULL DEFAULT ''; PRAGMA user_version = 5;"); err != nil {
+			return err
+		}
+	case 5:
 	default:
 		return fmt.Errorf("unsupported schema version %d; use a compatible Tasky version", version)
 	}

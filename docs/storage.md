@@ -9,10 +9,13 @@ not import, move, or modify existing work.
 
 Call `store.Open(path)` with an explicit database filename, then close the Store
 when finished. Opening creates missing parent directories and initializes schema
-version 4 in a transaction (upgrading older versions without changing IDs).
+version 5 in a transaction (upgrading older versions without changing IDs).
 Version 3 adds verified worktree identities; see [inspection](inspection.md)
 for explicit enrollment of mappings created by older versions.
 Version 4 adds [cleanup intent and recovery](cleanup.md).
+Version 5 adds the original Repo's Git identity to cleanup intent so recovery
+cannot delete a branch in a replacement Repo at the stored path. Older pending
+cleanup requires manual review and intent abandonment rather than unsafe replay.
 Registration commands open `tasky.sqlite3` beside the
 YAML configuration file. Unsupported schema versions and invalid databases
 return errors rather than being replaced.

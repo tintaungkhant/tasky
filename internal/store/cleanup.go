@@ -27,15 +27,15 @@ PRAGMA user_version = 4;
 `
 
 type Cleanup struct {
-	ID, RootID, TaskID, RepoID, WorktreeID, Path, Identity, Branch, Revision string
-	DeleteBranch, ForceWorktree, ForceBranch, Removed                        bool
+	ID, RootID, TaskID, RepoID, WorktreeID, Path, Identity, RepoIdentity, Branch, Revision string
+	DeleteBranch, ForceWorktree, ForceBranch, Removed                                      bool
 }
 
-const cleanupColumns = "id, root_id, task_id, repo_id, worktree_id, path, identity, branch, revision, delete_branch, force_worktree, force_branch, removed"
+const cleanupColumns = "id, root_id, task_id, repo_id, worktree_id, path, identity, repo_identity, branch, revision, delete_branch, force_worktree, force_branch, removed"
 
 func scanCleanup(row interface{ Scan(...any) error }) (Cleanup, error) {
 	var c Cleanup
-	err := row.Scan(&c.ID, &c.RootID, &c.TaskID, &c.RepoID, &c.WorktreeID, &c.Path, &c.Identity, &c.Branch, &c.Revision, &c.DeleteBranch, &c.ForceWorktree, &c.ForceBranch, &c.Removed)
+	err := row.Scan(&c.ID, &c.RootID, &c.TaskID, &c.RepoID, &c.WorktreeID, &c.Path, &c.Identity, &c.RepoIdentity, &c.Branch, &c.Revision, &c.DeleteBranch, &c.ForceWorktree, &c.ForceBranch, &c.Removed)
 	return c, err
 }
 
@@ -58,15 +58,19 @@ func (s *Store) ListCleanups(rootID string) ([]Cleanup, error) {
 
 // ReserveCleanup persists exact intent before any Git side effects. The SELECT
 // guards against a stale snapshot after detach, reconnect, or reassignment.
-func (s *Store) ReserveCleanup(wt Worktree, branch, revision string, deleteBranch, forceWorktree, forceBranch bool) (Cleanup, error) {
+func (s *Store) ReserveCleanup(wt Worktree, branch, revision string, deleteBranch, forceWorktree, forceBranch bool, repoIdentities ...string) (Cleanup, error) {
+	repoIdentity := ""
+	if len(repoIdentities) > 0 {
+		repoIdentity = repoIdentities[0]
+	}
 	_, key, err := location(wt.Path)
 	if err != nil {
 		return Cleanup{}, err
 	}
-	c := Cleanup{ID: rand.Text(), TaskID: wt.TaskID, RepoID: wt.RepoID, WorktreeID: wt.ID, Path: wt.Path, Identity: wt.Identity, Branch: branch, Revision: revision, DeleteBranch: deleteBranch, ForceWorktree: forceWorktree, ForceBranch: forceBranch}
-	result, err := s.db.Exec(`INSERT INTO cleanups(id, root_id, task_id, repo_id, worktree_id, path, path_key, identity, branch, revision, delete_branch, force_worktree, force_branch)
- SELECT ?, root_id, task_id, repo_id, id, path, path_key, identity, ?, ?, ?, ?, ? FROM worktrees
- WHERE id = ? AND task_id = ? AND repo_id = ? AND path_key = ? AND identity = ?`, c.ID, branch, revision, deleteBranch, forceWorktree, forceBranch, wt.ID, wt.TaskID, wt.RepoID, key, wt.Identity)
+	c := Cleanup{ID: rand.Text(), TaskID: wt.TaskID, RepoID: wt.RepoID, WorktreeID: wt.ID, Path: wt.Path, Identity: wt.Identity, RepoIdentity: repoIdentity, Branch: branch, Revision: revision, DeleteBranch: deleteBranch, ForceWorktree: forceWorktree, ForceBranch: forceBranch}
+	result, err := s.db.Exec(`INSERT INTO cleanups(id, root_id, task_id, repo_id, worktree_id, path, path_key, identity, repo_identity, branch, revision, delete_branch, force_worktree, force_branch)
+	 SELECT ?, root_id, task_id, repo_id, id, path, path_key, identity, ?, ?, ?, ?, ?, ? FROM worktrees
+	 WHERE id = ? AND task_id = ? AND repo_id = ? AND path_key = ? AND identity = ?`, c.ID, repoIdentity, branch, revision, deleteBranch, forceWorktree, forceBranch, wt.ID, wt.TaskID, wt.RepoID, key, wt.Identity)
 	if err := changed("reserve cleanup; inspect tasky pending before retrying", result, err); err != nil {
 		return Cleanup{}, err
 	}
