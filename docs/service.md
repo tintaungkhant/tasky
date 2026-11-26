@@ -19,9 +19,10 @@ Root options include their name, path, and internal identity; duplicate names
 remain independently selectable. Selection starts empty and is cleared if a
 refresh removes the selected Root. Registration supports YAML preferences,
 Root/Repo registration, verified legacy import, and confirmed Root mapping
-removal. Task workflow screens follow in the GUI plan,
+removal. The Tasks tab searches registered Tasks and inspects live Git state.
+Task mutations and recovery screens follow in the GUI plan,
 [spec #22](https://github.com/tintaungkhant/tasky/issues/22); use the existing CLI
-commands for Task operations today. Production assets are embedded in the Go
+commands for those operations today. Production assets are embedded in the Go
 binary. Users need no frontend build, Node installation, or separate service.
 
 ## Local access and sessions
@@ -66,6 +67,7 @@ are outside the approved scope.
 | `PUT /api/preferences` | `{ expected: <loaded preferences>, config: <edited preferences> }`; validates and saves the entire YAML Root list, rejecting stale edits. |
 | `POST /api/registration/roots` | `{ Name, Path }`; registers an existing Root directory, returning its identity. |
 | `GET /api/repos?root=…` | Lists Repos for exactly one registered Root ID. Names and directory context are not selectors here. |
+| `GET /api/tasks?root=…` | Exact Root ID; returns an array of `{ Task, Worktrees: [{ Mapping, Repo, State }] }` with fresh shared Git inspection. Empty lists are `[]`. |
 | `POST /api/registration/repos` | `{ RootID, Name, Path }`; registers the verified primary Git worktree, including nested/external paths. |
 | `POST /api/import` | Empty JSON object; runs shared verified legacy import against saved YAML preferences. |
 | `GET /api/registration/removal?root=…` | Exact Root ID; returns the Root and every Repo, Task, and worktree mapping that removal would forget. Pending operations block the preview. |
@@ -94,6 +96,31 @@ require a single JSON body, reject unknown fields/trailing values/query paramete
 and limit bodies to 1 MiB. Root/Repo paths must be absolute. Input errors retain
 the relevant path or validation message. Names are labels; registration APIs use
 exact persisted IDs for existing records.
+
+## Task discovery and inspection
+
+Select a Root, then search by Task ID or optional Unicode name. Search filters
+the loaded list in the browser without changing persisted names or IDs. Select
+a Task with the native keyboard-accessible picker to see each associated Repo,
+Repo path, worktree path, current branch (including detached HEAD), location
+health, and clean or dirty/untracked Git porcelain status. Multiple worktrees
+from the same Repo remain separate. A Task with no associations remains visible.
+
+Refresh Tasks re-reads mappings and live Git state; external changes are not
+polled automatically. The inspection is a point-in-time observation, not a lock
+on Git. Switching Roots clears the search and Task selection, and late responses
+from a previous Root are discarded. Refresh hides previous details while loading
+or when it fails; deleted Tasks cannot remain selected after a successful refresh.
+The same public Task ID in another Root is a different Task.
+
+Inspection uses the existing `work.Manager.Inspect` checks. Missing, inaccessible,
+invalid, and unverified mappings retain their paths and actionable CLI guidance;
+untrusted locations do not display branch or clean status. Replacement checkouts
+are rejected through recorded Git administrative identity. Inspection neither
+repairs nor enrolls mappings. Use `tasky reconnect`, `attach`, or `detach` after
+reviewing the reported problem. Discovery requires an exact persisted Root ID,
+not a Root name or inferred current directory, and does not depend on YAML
+preferences or the continued existence of the Root directory.
 
 ## Registration and preferences
 
@@ -163,7 +190,8 @@ CSS, and local fonts. Commit those assets with the sources: `go build ./...`
 and `go install` then work without Node. `typecheck` runs TypeScript independently;
 `test` runs Vitest/Testing Library in jsdom, checking session exchange, explicit
 Root identity selection, refresh, keyboard tabs, empty states, and errors, plus
-YAML editing, Repo registration, repeatable import, and explicit removal consent.
+YAML editing, Repo registration, repeatable import, explicit removal consent,
+Task search and selection, live refresh, unhealthy locations, and stale Root responses.
 The generated shadcn components emit Fast Refresh export warnings during lint;
 they do not affect the production build.
 
@@ -177,5 +205,8 @@ Browser/visual verification was not run (repository permission setting). To
 inspect manually, run `go run . serve`, open its printed URL, check Root selection
 and refresh, then use Tab and arrow keys through the section tabs. On a disposable
 Root, check Registration's YAML add/edit/remove, import, and Root/Repo forms;
-inspect the full removal preview and checkbox before forgetting mappings. Task,
-Recovery, and Backup content still explains which workflows are coming next.
+inspect the full removal preview and checkbox before forgetting mappings. In Tasks,
+search a Unicode name, select a Task with the keyboard, change its Git branch or
+files externally, and click Refresh Tasks. Check detached HEAD and unavailable
+location guidance on disposable worktrees. Recovery and Backup content still
+explains which workflows are coming next.

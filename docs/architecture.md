@@ -5,7 +5,7 @@ interactive prompts, output writers, and process-wide command flags. CLI adapter
 collect selections and confirmations, call these operations, and format the
 returned values and errors. `internal/web` provides the protected local HTTP
 service and uses shared Registry context resolution. Dashboard workflow handlers
-will call the same application operations directly; see [service.md](service.md).
+reuse the existing application and domain operations; see [service.md](service.md).
 
 ## Context and ownership
 
@@ -24,6 +24,11 @@ complete file publication and stale-list detection; CLI `setup` uses that same
 save boundary. Registry still owns registration/Git validation. Store owns
 transactionally consistent Root removal previews and conditional deletion, so
 HTTP confirmation cannot forget mappings created since the preview.
+
+Read-only Task discovery lists mappings through Store and calls `work.Manager.Inspect`,
+the same inspector used by CLI listing. It requires an exact Root identity and
+does not need YAML settings or a reachable Root directory to report broken locations.
+HTTP and frontend code do not implement Git validation or identity checks.
 
 The existing packages remain responsible for their invariants:
 
