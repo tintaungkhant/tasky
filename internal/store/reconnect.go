@@ -1,6 +1,9 @@
 package store
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Reconnect preserves identity and ownership. A stale snapshot cannot overwrite
 // a concurrent move, detach, or reassignment.
@@ -30,6 +33,9 @@ func (s *Store) Reconnect(wt Worktree, path, identity string) error {
  WHERE id = ? AND task_id = ? AND repo_id = ? AND path = ? AND identity = ?
  AND NOT EXISTS (SELECT 1 FROM creations WHERE path_key = ?)`, path, key, identity, wt.ID, wt.TaskID, wt.RepoID, wt.Path, wt.Identity, key)
 	if err := changed("reconnect; mapping changed or location reserved, inspect before retrying", result, err); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("mapping changed or location reserved; inspect before reconnecting: %w", ErrConflict)
+		}
 		return err
 	}
 	return tx.Commit()

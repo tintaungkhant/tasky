@@ -3,11 +3,12 @@ import { Button } from '@/components/ui/button'
 import { request, type Root } from './api'
 import TaskCreation from './TaskCreation'
 import TaskRename from './TaskRename'
+import TaskAssociations, { type Mapping } from './TaskAssociations'
 
 type Inspection = {
   Task: { ID: string; RootID: string; TaskID: string; Name: string }
   Worktrees: {
-    Mapping: { ID: string; Path: string }
+    Mapping: Mapping
     Repo: { ID: string; Name: string; Path: string }
     State: { Status: string; Branch: string; Changes: string; Detail: string }
   }[]
@@ -25,6 +26,7 @@ function RootTasks({ root }: { root: Root }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [attaching, setAttaching] = useState(false)
   function refresh() {
     setLoading(true); setError(''); setAttempt((value) => value + 1)
   }
@@ -49,8 +51,10 @@ function RootTasks({ root }: { root: Root }) {
     <h2 className="text-lg font-medium">Tasks</h2>
     <Button variant="outline" disabled={loading} onClick={refresh}>Refresh Tasks</Button>
     <Button variant="outline" onClick={() => setCreating((value) => !value)} aria-expanded={creating}>Add worktree</Button>
+    <Button variant="outline" onClick={() => setAttaching((value) => !value)} aria-expanded={attaching}>Attach worktree</Button>
     {creating && <TaskCreation root={root} onCreated={refresh} />}
-    <p>Refresh reads current Git state. Use the CLI to change associations.</p>
+    {attaching && <TaskAssociations root={root} onChanged={refresh} />}
+    <p>Refresh reads current Git state. Attach, detach, and reconnect manage Tasky associations; Git files and branches remain in place.</p>
     {loading ? <p role="status">Loading Tasks and live Git state…</p> : error ? <p role="alert">{error}</p> : <>
       <div className="space-y-1">
         <label htmlFor="task-search" className="block font-medium">Search Tasks by Task ID or name</label>
@@ -81,6 +85,7 @@ function RootTasks({ root }: { root: Root }) {
             </dl>
             {State.Status === 'ok' && State.Changes && <pre className="overflow-auto whitespace-pre-wrap">{State.Changes}</pre>}
             {State.Detail && <p>{State.Detail}</p>}
+            <TaskAssociations key={JSON.stringify(Mapping)} root={root} mapping={Mapping} onChanged={refresh} />
           </article>)}
         </section> : <p role="status">Select a Task to inspect its associated worktrees.</p>}
       </>}

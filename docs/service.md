@@ -20,7 +20,8 @@ remain independently selectable. Selection starts empty and is cleared if a
 refresh removes the selected Root. Registration supports YAML preferences,
 Root/Repo registration, verified legacy import, and confirmed Root mapping
 removal. The Tasks tab searches registered Tasks, inspects live Git state,
-creates worktrees, and renames Tasks. Association and recovery screens follow in the GUI plan,
+creates worktrees, renames Tasks, attaches/detaches checkouts, and reconnects moved
+worktrees. Editor, cleanup, and recovery screens follow in the GUI plan,
 [spec #22](https://github.com/tintaungkhant/tasky/issues/22); use the existing CLI
 commands for those operations today. Production assets are embedded in the Go
 binary. Users need no frontend build, Node installation, or separate service.
@@ -71,6 +72,10 @@ are outside the approved scope.
 | `GET /api/tasks/options?root=…&repo=…` | Exact Root and Repo IDs; returns `{ Branches, CurrentBranch, TasksDir, BranchTemplate }` from Git and effective application settings. |
 | `POST /api/tasks/create` | `{ RootID, RepoID, TaskID, Name, Branch, Base, AsIs }`; creates one verified worktree through `app.Context.Create`, returning 201 with `{ Path, Branch }` only on completion. Name, Base, and AsIs are optional. |
 | `POST /api/tasks/rename` | `{ RootID, ID, Name }`; renames an exact internal Task ID in the selected Root. Name is required but may be empty. Preserves branches, paths, and associations. |
+| `POST /api/tasks/attach/preview` | `{ RootID, RepoID, TaskID, Name, Path }`; verifies an absolute checkout path and returns an attachment review with canonical path, Git identity, target internal identity (empty for a new Task), and current source mapping/Task/Root, or null source fields if unowned. |
+| `POST /api/tasks/attach` | `{ Review, ReassignFrom }`; re-verifies the checkout and atomically checks the reviewed target and source mapping. Reassignment requires the source's internal Task identity. Returns the associated mapping. |
+| `POST /api/tasks/detach` | `{ RootID, Mapping }`; forgets only the exact reviewed mapping snapshot. Files and Git branches are preserved, including dirty or unavailable checkouts. |
+| `POST /api/tasks/reconnect` | `{ RootID, Mapping, Path, AcceptIdentity }`; verifies an absolute destination and reconnects the exact mapping snapshot to its original Git checkout. Explicit acceptance enrolls an unverified mapping but never overrides a recorded identity mismatch. |
 | `POST /api/registration/repos` | `{ RootID, Name, Path }`; registers the verified primary Git worktree, including nested/external paths. |
 | `POST /api/import` | Empty JSON object; runs shared verified legacy import against saved YAML preferences. |
 | `GET /api/registration/removal?root=…` | Exact Root ID; returns the Root and every Repo, Task, and worktree mapping that removal would forget. Pending operations block the preview. |
@@ -204,6 +209,29 @@ checks CLI startup output, flag validation, and cancellation. Tests close every
 listener and use no browser. Required Go build, vet, and full test checks still
 apply. Frontend behavior checks are described below; no browser is opened by them.
 
+## Associations and reconnection
+
+In Tasks, choose **Attach worktree**, select the exact Repo, enter a new or existing
+Root-scoped Task ID and an absolute checkout path, then review before attaching.
+Existing Tasks retain their name. The preview shows the canonical path, verified
+Git identity, and any source owner, including its Root and internal Task identity.
+Reassignment requires explicit consent for that source. Editing inputs discards
+the preview; a failed submission requires a new review. The server re-verifies
+Git and compares the complete source mapping and target identity in the write
+transaction. Changed owners, replaced mappings, or reused public Task IDs cannot
+silently retarget an old review. Dirty and external checkouts are supported.
+
+Each inspected worktree has mapping-only detach and reconnect controls. Detach
+preserves files, branches, and dirty changes. Reconnect requires an absolute path
+to the original checkout; move/repair Git worktree registration outside Tasky
+first. A mapping without a recorded identity requires explicit review and
+acceptance to enroll the checkout. That acceptance cannot override a known
+identity mismatch. Snapshot checks reject stale detach/reconnect requests.
+Pending-operation errors preserve their recovery instructions; use `tasky pending`
+and `tasky recover` until the recovery dashboard is available. These association
+operations use persisted registration and do not depend on YAML creation settings.
+Switching Roots or closing a form does not cancel a submitted operation.
+
 ## Frontend development
 
 The frontend was scaffolded with Vite's React/TypeScript generator and shadcn's
@@ -229,7 +257,8 @@ and `go install` then work without Node. `typecheck` runs TypeScript independent
 Root identity selection, refresh, keyboard tabs, empty states, and errors, plus
 YAML editing, Repo registration, repeatable import, explicit removal consent,
 Task search and selection, live refresh, unhealthy locations, stale Root responses,
-creation forms and failure/retry states, and exact Task rename requests.
+creation forms and failure/retry states, exact Task rename requests, reviewed
+reassignment, and mapping snapshot detach/reconnect requests.
 The generated shadcn components emit Fast Refresh export warnings during lint;
 they do not affect the production build.
 
@@ -251,3 +280,8 @@ explains which workflows are coming next. In a disposable Root, use Add worktree
 with a new templated branch, an existing branch, and a verbatim branch/base.
 Repeat across Repos, then rename the Task and confirm paths and branches stay
 unchanged. A failed creation must show its error and any pending recovery guidance.
+Attach a dirty external checkout, review its current owner before reassignment,
+and detach it while confirming files and branches remain. Move a disposable
+worktree with Git, refresh, and reconnect its recorded mapping to the new path.
+Check explicit enrollment of an unverified mapping and rejection of a different
+checkout even with enrollment selected.
