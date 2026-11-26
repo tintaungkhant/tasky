@@ -73,11 +73,9 @@ editor workspace files; a failure reports partial removal. [Live inspection](ins
 checks worktree identity before showing branch and status. [Safe cleanup](cleanup.md)
 documents protection overrides and recovery of interrupted removals.
 
-`vscode` includes mapped paths, including multiple checkouts per Repo. It keeps
-the original workspace location for an adopted Task and otherwise writes under
-the managed Task directory. An identical existing workspace file is retained;
-a differing existing file is preserved with an error asking you to move or
-preserve it before regeneration. Editor refresh improvements remain in #10.
+[`vscode`](editor.md) verifies every mapped checkout before publishing a workspace,
+including external paths and multiple worktrees per Repo. Existing workspace
+files are preserved; follow the editor documentation to regenerate after changes.
 
 Schema migrations through version 5 are transactional and preserve IDs. Earlier
 binaries reject the newer schema. Keep using the new binary for registered

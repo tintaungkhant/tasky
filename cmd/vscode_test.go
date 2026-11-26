@@ -68,9 +68,19 @@ func TestVSCodeRerunPicksUpNewFolder(t *testing.T) {
 		t.Fatalf("add project-b: %v", err)
 	}
 
-	// ...must show up when vscode is re-run, not just what was there originally.
+	// Preserve existing output until the user explicitly moves it aside.
+	if err := execVSCode(t, "CRO-022-multi"); err == nil {
+		t.Fatal("expected existing workspace protection")
+	}
+	ws = readWorkspace(t, workspacePath)
+	if len(ws.Folders) != 1 {
+		t.Fatalf("existing workspace changed: %+v", ws)
+	}
+	if err := os.Rename(workspacePath, workspacePath+".saved"); err != nil {
+		t.Fatal(err)
+	}
 	if err := execVSCode(t, "CRO-022-multi"); err != nil {
-		t.Fatalf("vscode (second run): %v", err)
+		t.Fatal(err)
 	}
 	ws = readWorkspace(t, workspacePath)
 	if len(ws.Folders) != 2 {

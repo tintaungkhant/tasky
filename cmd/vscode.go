@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,8 +13,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tintaungkhant/tasky/internal/config"
+	"github.com/tintaungkhant/tasky/internal/git"
 	"github.com/tintaungkhant/tasky/internal/task"
-	"github.com/tintaungkhant/tasky/internal/ui"
 )
 
 // taskIDOptions builds a Task ID select option per entry, labeled with its
@@ -102,6 +104,11 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 	var folders []string
 	for _, e := range entries {
 		if e.IsDir() {
+			path := filepath.Join(taskDir, e.Name())
+			if _, _, err := git.VerifyWorktree(path); err != nil {
+				cmd.Printf("Skipped %s: %v\n", path, err)
+				continue
+			}
 			folders = append(folders, e.Name())
 		}
 	}
@@ -115,16 +122,27 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 		ws.Folders = append(ws.Folders, vscodeFolder{Path: "./" + f})
 	}
 
+	workspacePath := filepath.Join(taskDir, task.TaskDirName(entry.ID, entry.Name)+".code-workspace")
+	return writeWorkspace(cmd, workspacePath, ws)
+}
+
+func writeWorkspace(cmd *cobra.Command, path string, ws vscodeWorkspace) error {
 	data, err := json.MarshalIndent(ws, "", "  ")
 	if err != nil {
 		return fmt.Errorf("build workspace file: %w", err)
 	}
 
-	workspacePath := filepath.Join(taskDir, task.TaskDirName(entry.ID, entry.Name)+".code-workspace")
-	if err := os.WriteFile(workspacePath, data, 0o644); err != nil {
-		return fmt.Errorf("write workspace file %s: %w", workspacePath, err)
+	if err := publishNewFile(path, data); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			previous, readErr := os.ReadFile(path)
+			if readErr == nil && bytes.Equal(previous, data) {
+				cmd.Printf("Workspace file is current: %s\n", path)
+				return nil
+			}
+			return fmt.Errorf("workspace file %s exists; preserve or move it before regenerating", path)
+		}
+		return fmt.Errorf("write workspace file %s: %w", path, err)
 	}
-
-	fmt.Println(ui.Success("Wrote workspace file at %s", workspacePath))
+	cmd.Printf("Wrote workspace file at %s\n", path)
 	return nil
 }
