@@ -12,3 +12,4 @@ Docs describing how the project works now. Keep them true: see `.ai/rules/docs.m
 - `editor.md`: verified workspace generation and safe regeneration.
 - `compatibility.md`: CLI compatibility, Git independence, and behavior verification.
 - `architecture.md`: shared application operations and the CLI/HTTP boundary.
+- `service.md`: loopback HTTP startup, session protection, and current API.

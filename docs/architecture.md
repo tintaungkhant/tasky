@@ -3,8 +3,9 @@
 `internal/app` coordinates registered Task operations independently of Cobra,
 interactive prompts, output writers, and process-wide command flags. CLI adapters
 collect selections and confirmations, call these operations, and format the
-returned values and errors. The HTTP service is planned in spec #22; it is not
-implemented yet. Future HTTP handlers can call the same operations directly.
+returned values and errors. `internal/web` provides the protected local HTTP
+service and uses shared Registry context resolution. Dashboard workflow handlers
+will call the same application operations directly; see [service.md](service.md).
 
 ## Context and ownership
 

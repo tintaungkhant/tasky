@@ -48,7 +48,7 @@ Approved revamp direction (2026-11-25; CLI completed 2026-11-26):
 
 The CLI revamp and SQLite integration are complete. See [docs/storage.md](docs/storage.md) for current storage behavior and [docs/architecture.md](docs/architecture.md) for shared application ownership.
 
-Approved GUI direction (2026-11-26; planned, not implemented): [spec #22](https://github.com/tintaungkhant/tasky/issues/22), tickets #23–#32.
+Approved GUI direction (2026-11-26; implementation in progress): [spec #22](https://github.com/tintaungkhant/tasky/issues/22), tickets #23–#32.
 
 - `tasky serve` runs a local-only service and prints its web dashboard URL, like MinIO's console; no desktop wrapper or remote access.
 - Frontend: React + TypeScript + shadcn/ui + Tailwind. Built assets ship inside the Go binary; users need no Node installation or separate frontend service.
