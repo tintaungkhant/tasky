@@ -181,6 +181,14 @@ tasky completion bash > /etc/bash_completion.d/tasky
 tasky completion fish > ~/.config/fish/completions/tasky.fish
 ```
 
+### `tasky serve [--port <port>]`
+
+Run the protected local HTTP service, print its Dashboard access URL, and stop
+with Ctrl+C. The default port is 9000; use `--port 0` for an available port.
+The current service offers a connection page and status/context APIs; dashboard
+screens follow in the approved GUI plan. See [local service](docs/service.md) for
+session protection, API behavior, and startup details.
+
 ## Development
 
 ```sh
@@ -196,6 +204,7 @@ internal/git/     Thin wrappers over git commands
 internal/store/   SQLite identities, associations, operation journals, backup/restore
 internal/work/    Verified worktree lifecycle and recovery
 internal/app/     Shared application operations and structured results
+internal/web/     Protected loopback HTTP service
 internal/registry/ Root/Repo registration and context selection
 internal/adopt/   Legacy import verification
 internal/task/    Pure domain logic: branch rendering, task/worktree paths
