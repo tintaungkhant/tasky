@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { request, type Root } from './api'
+import TaskCreation from './TaskCreation'
+import TaskRename from './TaskRename'
 
 type Inspection = {
   Task: { ID: string; RootID: string; TaskID: string; Name: string }
@@ -22,6 +24,10 @@ function RootTasks({ root }: { root: Root }) {
   const [attempt, setAttempt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [creating, setCreating] = useState(false)
+  function refresh() {
+    setLoading(true); setError(''); setAttempt((value) => value + 1)
+  }
 
   useEffect(() => {
     let active = true
@@ -41,18 +47,16 @@ function RootTasks({ root }: { root: Root }) {
 
   return <section aria-label="Task discovery" className="space-y-4">
     <h2 className="text-lg font-medium">Tasks</h2>
-    <Button variant="outline" disabled={loading} onClick={() => {
-      setLoading(true)
-      setError('')
-      setAttempt((value) => value + 1)
-    }}>Refresh Tasks</Button>
-    <p>Refresh reads current Git state. Use the CLI to create Tasks or change associations.</p>
+    <Button variant="outline" disabled={loading} onClick={refresh}>Refresh Tasks</Button>
+    <Button variant="outline" onClick={() => setCreating((value) => !value)} aria-expanded={creating}>Add worktree</Button>
+    {creating && <TaskCreation root={root} onCreated={refresh} />}
+    <p>Refresh reads current Git state. Use the CLI to change associations.</p>
     {loading ? <p role="status">Loading Tasks and live Git state…</p> : error ? <p role="alert">{error}</p> : <>
       <div className="space-y-1">
         <label htmlFor="task-search" className="block font-medium">Search Tasks by Task ID or name</label>
         <input id="task-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-md border p-2" />
       </div>
-      {rows.length === 0 ? <p role="status">No Tasks in this Root. Use the CLI to create a Task or import legacy data in Registration.</p> : matches.length === 0 ? <p role="status">No matching Tasks.</p> : <>
+      {rows.length === 0 ? <p role="status">No Tasks in this Root. Add a worktree to create a Task, or import legacy data in Registration.</p> : matches.length === 0 ? <p role="status">No matching Tasks.</p> : <>
         <div className="space-y-1">
           <label htmlFor="task-select" className="block font-medium">Task</label>
           <select id="task-select" value={selected?.Task.ID ?? ''} onChange={(event) => setTaskID(event.target.value)} className="w-full rounded-md border bg-background p-2">
@@ -62,6 +66,7 @@ function RootTasks({ root }: { root: Root }) {
         </div>
         {selected ? <section aria-label="Task inspection" className="space-y-4 break-words">
           <h3 className="font-medium">{selected.Task.TaskID}{selected.Task.Name ? ` — ${selected.Task.Name}` : ''}</h3>
+          <TaskRename key={selected.Task.ID} root={root} task={selected.Task} onRenamed={refresh} />
           {selected.Worktrees.length === 0 && <p>No associated worktrees.</p>}
           {selected.Worktrees.map(({ Mapping, Repo, State }) => <article key={Mapping.ID} className="space-y-2 rounded-md border p-3">
             <h4 className="font-medium">Repo: {Repo.Name}</h4>

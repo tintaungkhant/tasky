@@ -19,8 +19,8 @@ Root options include their name, path, and internal identity; duplicate names
 remain independently selectable. Selection starts empty and is cleared if a
 refresh removes the selected Root. Registration supports YAML preferences,
 Root/Repo registration, verified legacy import, and confirmed Root mapping
-removal. The Tasks tab searches registered Tasks and inspects live Git state.
-Task mutations and recovery screens follow in the GUI plan,
+removal. The Tasks tab searches registered Tasks, inspects live Git state,
+creates worktrees, and renames Tasks. Association and recovery screens follow in the GUI plan,
 [spec #22](https://github.com/tintaungkhant/tasky/issues/22); use the existing CLI
 commands for those operations today. Production assets are embedded in the Go
 binary. Users need no frontend build, Node installation, or separate service.
@@ -68,6 +68,9 @@ are outside the approved scope.
 | `POST /api/registration/roots` | `{ Name, Path }`; registers an existing Root directory, returning its identity. |
 | `GET /api/repos?root=…` | Lists Repos for exactly one registered Root ID. Names and directory context are not selectors here. |
 | `GET /api/tasks?root=…` | Exact Root ID; returns an array of `{ Task, Worktrees: [{ Mapping, Repo, State }] }` with fresh shared Git inspection. Empty lists are `[]`. |
+| `GET /api/tasks/options?root=…&repo=…` | Exact Root and Repo IDs; returns `{ Branches, CurrentBranch, TasksDir, BranchTemplate }` from Git and effective application settings. |
+| `POST /api/tasks/create` | `{ RootID, RepoID, TaskID, Name, Branch, Base, AsIs }`; creates one verified worktree through `app.Context.Create`, returning 201 with `{ Path, Branch }` only on completion. Name, Base, and AsIs are optional. |
+| `POST /api/tasks/rename` | `{ RootID, ID, Name }`; renames an exact internal Task ID in the selected Root. Name is required but may be empty. Preserves branches, paths, and associations. |
 | `POST /api/registration/repos` | `{ RootID, Name, Path }`; registers the verified primary Git worktree, including nested/external paths. |
 | `POST /api/import` | Empty JSON object; runs shared verified legacy import against saved YAML preferences. |
 | `GET /api/registration/removal?root=…` | Exact Root ID; returns the Root and every Repo, Task, and worktree mapping that removal would forget. Pending operations block the preview. |
@@ -91,11 +94,45 @@ mapping conflicts 409, missing records/endpoints 404, and other operation failur
 500. Wrapped operation messages retain location, partial completion, pending IDs,
 and recovery instructions instead of reducing them to a generic error. Workflow
 endpoints are added by subsequent tickets; they use the same error envelope and
-the existing [application operations](architecture.md). Registration mutations
+the existing [application operations](architecture.md). Registration and Task mutations
 require a single JSON body, reject unknown fields/trailing values/query parameters,
 and limit bodies to 1 MiB. Root/Repo paths must be absolute. Input errors retain
 the relevant path or validation message. Names are labels; registration APIs use
 exact persisted IDs for existing records.
+
+## Task creation and renaming
+
+In Tasks, choose **Add worktree**, select a Repo by name/path/identity, and enter
+a new or existing Task ID. The form displays the effective Tasks Directory and
+Branch Template and provides native suggestions for local branches and bases.
+Existing branches are reused verbatim. New branches use the template unless
+**Use branch verbatim** is checked. An empty base uses the Repo's current branch;
+if HEAD is detached, supply a base explicitly. Git validates the branch and base.
+Refresh branch options after external Git changes; submission re-reads current
+settings and Git state rather than trusting the displayed suggestions.
+
+An optional Unicode name applies only to new Tasks; adding another worktree to
+an existing Task keeps its saved name. Repeat the form to add worktrees across
+Repos or multiple worktrees from one Repo. Each completed request reports its
+path and branch and refreshes discovery. Managed paths and creation protection
+remain those of the [registered Task workflow](tasks.md).
+
+Creation is one worktree per request, with no batch rollback. Failures retain
+inputs and show the complete operation error. If a Task record was established,
+the error identifies it; a reserved creation includes its pending ID, location,
+and `tasky pending`/`tasky recover` instructions. Earlier successful requests remain
+completed. An empty Task, directory, branch, or checkout can remain after a
+failure; refresh inspection and review pending intent before retrying. Recovery
+currently uses the CLI. A disconnected request may also have completed: inspect
+Git, Tasks, and pending intent before submitting again. Switching Roots or closing
+the form does not cancel an already submitted operation in the original Root.
+
+Select a Task to edit its optional name, including clearing it. Rename targets
+the selected internal identity, never a public Task ID that could have been
+re-used. It only updates the stored label and then refreshes inspection. It does
+not require valid YAML preferences or reachable Git locations. Root and Repo
+selectors for creation must be exact persisted IDs, and creation requires an
+absolute Tasks Directory.
 
 ## Task discovery and inspection
 
@@ -191,7 +228,8 @@ and `go install` then work without Node. `typecheck` runs TypeScript independent
 `test` runs Vitest/Testing Library in jsdom, checking session exchange, explicit
 Root identity selection, refresh, keyboard tabs, empty states, and errors, plus
 YAML editing, Repo registration, repeatable import, explicit removal consent,
-Task search and selection, live refresh, unhealthy locations, and stale Root responses.
+Task search and selection, live refresh, unhealthy locations, stale Root responses,
+creation forms and failure/retry states, and exact Task rename requests.
 The generated shadcn components emit Fast Refresh export warnings during lint;
 they do not affect the production build.
 
@@ -209,4 +247,7 @@ inspect the full removal preview and checkbox before forgetting mappings. In Tas
 search a Unicode name, select a Task with the keyboard, change its Git branch or
 files externally, and click Refresh Tasks. Check detached HEAD and unavailable
 location guidance on disposable worktrees. Recovery and Backup content still
-explains which workflows are coming next.
+explains which workflows are coming next. In a disposable Root, use Add worktree
+with a new templated branch, an existing branch, and a verbatim branch/base.
+Repeat across Repos, then rename the Task and confirm paths and branches stay
+unchanged. A failed creation must show its error and any pending recovery guidance.

@@ -30,6 +30,13 @@ the same inspector used by CLI listing. It requires an exact Root identity and
 does not need YAML settings or a reachable Root directory to report broken locations.
 HTTP and frontend code do not implement Git validation or identity checks.
 
+HTTP creation validates exact Root/Repo membership before opening the shared
+application Context, so form values cannot fall back to directory or name
+selection. Options expose that Context's effective settings and live Git branch
+list; submission calls `Context.Create` again. Rename scopes an internal Task ID
+to its Root and calls Store's label-only `RenameTask`, also used by the CLI's
+application operation, so a removed Task's public ID cannot retarget a stale form.
+
 The existing packages remain responsible for their invariants:
 
 - `registry`: Root/Repo registration, filesystem/Git identity, and context selection.

@@ -88,3 +88,37 @@ it('discards old Root responses and stale Task details on Root changes', async (
   await act(async () => { resolve(new Response(JSON.stringify(rows))) })
   await waitFor(() => expect(screen.queryByRole('option', { name: /T-1/ })).not.toBeInTheDocument())
 })
+
+it('refreshes discovery after creation and refreshes the selected Task after rename', async () => {
+  const user = userEvent.setup()
+  let current: typeof rows = []
+  const fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+    let body: unknown = current
+    if (url.startsWith('/api/repos?')) body = [{ ID: 'repo', Name: 'api', Path: 'C:/repo' }]
+    if (url.startsWith('/api/tasks/options?')) body = { Branches: ['main'], CurrentBranch: 'main', TasksDir: 'C:/tasks', BranchTemplate: '{branch}' }
+    if (url === '/api/tasks/create') {
+      current = rows
+      body = { Path: 'C:/checkout', Branch: 'feature' }
+    }
+    if (url === '/api/tasks/rename') {
+      const payload = JSON.parse(options!.body as string)
+      current = [{ ...rows[0], Task: { ...task, Name: payload.Name } }]
+      body = { Message: 'Renamed' }
+    }
+    return Promise.resolve(new Response(JSON.stringify(body)))
+  })
+  vi.stubGlobal('fetch', fetch)
+  render(<Tasks root={root} />)
+  await screen.findByText(/No Tasks in this Root/)
+  await user.click(screen.getByRole('button', { name: 'Add worktree' }))
+  await user.selectOptions(await screen.findByLabelText('Repo'), 'repo')
+  await user.type(await screen.findByLabelText('Task ID'), 'T-1')
+  await user.type(screen.getByLabelText('Branch'), 'feature')
+  await user.click(screen.getByRole('button', { name: 'Create worktree' }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: 'Task' }), task.ID)
+  await user.clear(screen.getByLabelText('Task name'))
+  await user.type(screen.getByLabelText('Task name'), 'Renamed')
+  await user.click(screen.getByRole('button', { name: 'Rename Task' }))
+  expect(await screen.findByRole('heading', { name: 'T-1 — Renamed' })).toBeInTheDocument()
+  expect(screen.getByText('C:/checkout')).toBeInTheDocument()
+})
