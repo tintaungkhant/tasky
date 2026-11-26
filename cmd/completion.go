@@ -9,6 +9,7 @@ import (
 	"github.com/tintaungkhant/tasky/internal/config"
 	"github.com/tintaungkhant/tasky/internal/git"
 	"github.com/tintaungkhant/tasky/internal/task"
+	"github.com/tintaungkhant/tasky/internal/work"
 )
 
 func init() {
@@ -101,18 +102,30 @@ func completeDeleteArgs(cmd *cobra.Command, args []string, toComplete string) ([
 		if len(args) == 0 {
 			return filterPrefix(taskIDs(entries), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}
-		wts, _, _, err := c.worktrees(args[0])
+		wts, mappings, repos, err := c.worktrees(args[0])
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		var candidates []string
 		seen := make(map[string]bool)
+		nameCount := make(map[string]int)
+		for _, repo := range repos {
+			nameCount[repo.Name]++
+		}
 		for _, wt := range wts {
+			mapping := mappings[wt.Path]
+			repo := repos[mapping.RepoID]
 			candidate := ""
 			if len(args) == 1 {
 				candidate = wt.RepoName
-			} else if len(args) == 2 && wt.RepoName == args[1] {
-				candidate, _ = git.CurrentBranch(wt.Path)
+				if nameCount[repo.Name] > 1 {
+					candidate = repo.ID
+				}
+			} else if len(args) == 2 && (repo.Name == args[1] || repo.ID == args[1]) {
+				state := (work.Manager{Store: c.Store}).Inspect(repo, mapping)
+				if state.Status == "ok" && state.Branch != "(detached HEAD)" {
+					candidate = state.Branch
+				}
 			}
 			if candidate != "" && !seen[candidate] {
 				candidates = append(candidates, candidate)

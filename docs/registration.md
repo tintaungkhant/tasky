@@ -47,7 +47,8 @@ the Root from the current directory. `context` additionally accepts
 Unknown and ambiguous contexts return errors showing the flags and list commands
 needed to make a choice. Missing or unreadable Repo locations cannot supply Git
 context; explicit selectors remain available to inspect their stored mappings.
-Live health reporting and reconnecting mappings are tracked in #7.
+See [inspection and reconnection](inspection.md) for live health reporting and
+reconnecting mappings after external moves.
 
 ## Storage and removal
 

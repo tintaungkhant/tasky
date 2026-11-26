@@ -9,3 +9,5 @@ Docs describing how the project works now. Keep them true: see `.ai/rules/docs.m
 - `inspection.md`: live Git state, location diagnostics, and safe reconnection.
 - `cleanup.md`: explicit cleanup effects, protections, and interrupted-operation recovery.
 - `backup.md`: consistent mapping backups, atomic restore, and database recovery.
+- `editor.md`: verified workspace generation and safe regeneration.
+- `compatibility.md`: CLI compatibility, Git independence, and behavior verification.

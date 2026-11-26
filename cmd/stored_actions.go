@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -92,12 +90,19 @@ func runStoredVSCode(cmd *cobra.Command, args []string, c *storedContext) error 
 	if err != nil {
 		return err
 	}
-	wts, _, _, err := c.worktrees(t.TaskID)
+	wts, mappings, repos, err := c.worktrees(t.TaskID)
 	if err != nil {
 		return err
 	}
 	if len(wts) == 0 {
 		return fmt.Errorf("no worktrees found for Task %s", t.TaskID)
+	}
+	for _, wt := range wts {
+		mapping := mappings[wt.Path]
+		state := (work.Manager{Store: c.Store}).Inspect(repos[mapping.RepoID], mapping)
+		if state.Status != "ok" {
+			return fmt.Errorf("cannot generate workspace for Task %s: %s [%s]: %s; no workspace written", t.TaskID, wt.Path, state.Status, state.Detail)
+		}
 	}
 	dir := work.TaskDirectory(c.Config.TasksDir, t.ID)
 	filename := t.ID + ".code-workspace"
@@ -124,31 +129,6 @@ func runStoredVSCode(cmd *cobra.Command, args []string, c *storedContext) error 
 		}
 		ws.Folders = append(ws.Folders, vscodeFolder{Path: "./" + filepath.ToSlash(rel)})
 	}
-	data, err := json.MarshalIndent(ws, "", "  ")
-	if err != nil {
-		return err
-	}
 	path := filepath.Join(dir, filename)
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if os.IsExist(err) {
-		previous, readErr := os.ReadFile(path)
-		if readErr == nil && bytes.Equal(previous, data) {
-			cmd.Printf("Workspace file is current: %s\n", path)
-			return nil
-		}
-		return fmt.Errorf("workspace file %s exists; preserve or move it before regenerating", path)
-	}
-	if err != nil {
-		return err
-	}
-	_, writeErr := f.Write(data)
-	closeErr := f.Close()
-	if writeErr != nil {
-		return writeErr
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	cmd.Printf("Wrote workspace file at %s\n", path)
-	return nil
+	return writeWorkspace(cmd, path, ws)
 }

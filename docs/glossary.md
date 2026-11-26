@@ -20,6 +20,12 @@ _Avoid_: Ticket, story
 A literal string the developer supplies to identify a Task within a Root (e.g. `CRO-001-payment`). Stored separately from the opaque internal identity and optional name, and substituted into `{task-id}` verbatim. Different Roots may reuse a Task ID. Only the legacy workflow uses Task IDs in directory names.
 _Avoid_: Ticket ID, task slug
 
+**Editor workspace file**:
+A `.code-workspace` file listing a Task's verified associated worktrees for editors
+that support VS Code's multi-root format. It is an editor artifact, not a grouping
+above Roots or the source of Task identity. User changes are preserved; see
+[editor.md](editor.md).
+
 **Tasks Directory**:
 The configured directory (per Root) where Task worktrees are created, e.g. `~/Work/company/tasks`. Stored explicitly per Root rather than always assumed to be `<root>/tasks`.
 _Avoid_: Worktrees dir, tasks folder

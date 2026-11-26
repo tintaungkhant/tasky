@@ -7,10 +7,12 @@ Task-oriented CLI on top of Git worktrees. Give it a task ID, a repo, and a bran
 ├── api/                                 ← Repo
 ├── web/                                 ← Repo
 └── tasks/                               ← Tasks Directory
-    └── CRO-001@refunds/                 ← Task (ID "CRO-001", name "refunds")
-        ├── api@task-CRO-001-fix-refund/ ← worktree on task/CRO-001/fix-refund
-        ├── web@task-CRO-001-refund-ui/  ← worktree on task/CRO-001/refund-ui
-        └── CRO-001@refunds.code-workspace
+    └── .tasky/
+        ├── format
+        └── <internal Task ID>/         ← Task ID "CRO-001", name "refunds"
+            ├── <opaque ID>/           ← api worktree
+            ├── <another opaque ID>/   ← web worktree
+            └── <internal Task ID>.code-workspace
 ```
 
 ## Why
@@ -51,26 +53,27 @@ tasky delete CRO-001 --delete-branch          # done: tear it all down
 
 ## Concepts
 
-The table and directory example describe the legacy layout. After
-[`tasky import`](docs/adoption.md) or [registration](docs/registration.md),
-[Task commands](docs/tasks.md) use SQLite identity and mappings. New worktrees
-use `<tasks_dir>/.tasky/<internal Task ID>/<opaque ID>`, and Task names are
-independent of paths. Nested and external Repos are supported. Adoption preserves
-existing locations and Git state.
+After [`tasky import`](docs/adoption.md) or [registration](docs/registration.md),
+[Task commands](docs/tasks.md) use SQLite identity and mappings. Task names are
+independent of paths. Repos and attached worktrees can be nested or external;
+adoption preserves existing locations and Git state. Unadopted YAML Roots retain
+the [legacy workflow](docs/adoption.md).
 Use [`attach` and `detach`](docs/associations.md) to organize existing checkouts;
 reassignment requires an explicit source Task identity.
 
 | Term | Meaning |
 |------|---------|
-| **Root** | A top-level directory (e.g. `~/Work/company`) holding one or more repos. tasky picks the Root containing your current directory by longest path-prefix match. |
-| **Repo** | A Git repository directly under a Root (must contain `.git`). |
-| **Task** | A unit of work (e.g. a Jira ticket) that may span several repos. Its worktrees live under `<tasks_dir>/<task-id>[@<name>]/`. |
-| **Task ID** | The literal string you type to name a task. Used verbatim — never truncated or parsed. |
-| **Task name** | Optional human-readable label, stored in the folder name as `<task-id>@<name>`. |
+| **Root** | A registered grouping of Repos and Tasks. Select by current-directory context or `--root`; ambiguous context requires selection. |
+| **Repo** | A registered Git repository, wherever its primary and linked worktrees live. |
+| **Task** | A persisted identity with associations to worktrees in one or more Repos. |
+| **Task ID** | A literal, Root-scoped identifier. Different Roots may reuse it. |
+| **Task name** | Optional Unicode label independent of branches, paths, and identity. |
 | **Tasks Directory** | Per-Root directory where task folders are created (default `<root>/tasks`). |
 | **Branch Template** | Per-Root pattern rendered into the branch name. Placeholders: `{task-id}`, `{task-name}`, `{branch}`. Substituted verbatim with no sanitization — Git rejects invalid names itself. |
 
-Worktree paths are `<tasks_dir>/<task-dir>/<repo>@<branch>`, with `/` in the branch replaced by `-`. Because the branch is part of the path, one task can hold several worktrees of the same repo on different branches.
+New worktrees have opaque paths under the Tasks Directory, so `foo/bar` and
+`foo-bar` cannot collide. A Task can hold multiple worktrees from the same Repo.
+Renaming a Task changes its label only.
 
 ## Configuration
 
@@ -88,12 +91,17 @@ When adding a Root, `tasks_dir` defaults to `<path>/tasks` and `branch_template`
 
 ## Commands
 
-The legacy Task commands below must be run from inside a YAML-configured Root
-(in a repo or the Root directory itself). The new `root`, `repo`, and `context`
-commands support [registration and explicit context selection](docs/registration.md).
-For registered Roots, see [Task workflows](docs/tasks.md) for `--root`, `--repo`,
-`--as-is`, `rename`, and creation recovery. Existing workspace files are preserved
-if regeneration would change their contents.
+Task commands resolve the registered Root from the current Repo or directory;
+use `--root <name-or-ID>` to select explicitly. `add` also accepts
+`--repo <name-or-ID>`. Names must be unambiguous; IDs resolve duplicate labels.
+See [registration](docs/registration.md) and [Task workflows](docs/tasks.md).
+
+Use [import](docs/adoption.md) for existing YAML Roots and Task directories,
+[attach/detach](docs/associations.md) for existing checkouts,
+[list/reconnect](docs/inspection.md) for external changes,
+[pending/recover](docs/cleanup.md) for interrupted cleanup, and
+[backup/restore](docs/backup.md) for mapping recovery. `setup` edits YAML settings;
+it does not register or import mappings.
 
 ### `tasky add [repo] <task-id> <branch>`
 
@@ -103,7 +111,8 @@ Create a task-scoped worktree.
 - **2 args** — `<task-id> <branch>`; repo is the one you're in.
 - **3 args** — `<repo> <task-id> <branch>`; repo named explicitly (works from the Root directory).
 
-If you run it from the Root directory without a repo arg, tasky prompts you to pick one.
+With no arguments, Repo selection is interactive when needed. With explicit
+arguments outside a registered Repo, supply the Repo argument or `--repo`.
 
 Branch handling:
 - A **new** branch name is rendered through the Branch Template and created from the base.
@@ -113,10 +122,14 @@ Branch handling:
 |------|-------------|
 | `--from <branch>` | Base branch for the new branch (default: current branch). |
 | `--name <name>` | Human-readable task name. Ignored if the task already exists. |
+| `--root <name-or-ID>` | Select a registered Root explicitly. |
+| `--repo <name-or-ID>` | Select a registered Repo instead of the positional argument. |
+| `--as-is` | Use a new branch name verbatim, without the Branch Template. |
 
 ### `tasky list [task-id]`
 
-Show a task's worktrees with their repo, current branch, and path.
+Show a Task's worktrees with their Repo, current branch, path, and local changes.
+Missing, inaccessible, invalid, and unverified mappings include recovery guidance.
 
 - No args — interactive, filterable task picker.
 - `<task-id>` — show that task.
@@ -124,11 +137,13 @@ Show a task's worktrees with their repo, current branch, and path.
 
 ### `tasky vscode [task-id]`
 
-Write `<task-dir>.code-workspace` inside the task folder, listing every worktree as a workspace folder. Prompts for the task when none is given.
+Write a multi-root workspace using every verified association, including external
+worktrees. Prompts for the Task when none is given. Prints the output path; open
+that path in VS Code, Cursor, Windsurf, or VSCodium. See [editor support](docs/editor.md).
 
 ```sh
-tasky vscode CRO-001
-code ~/Work/company/tasks/CRO-001@refunds/CRO-001@refunds.code-workspace
+tasky vscode CRO-001 --root company
+# Open the printed .code-workspace path in your editor.
 ```
 
 ### `tasky delete [task-id] [repo] [branch]`
@@ -140,16 +155,22 @@ Remove worktrees, and optionally their branches.
 - `<task-id> <repo>` — remove that repo's worktree (errors if there are several; add a branch).
 - `<task-id> <repo> <branch>` — remove that exact worktree.
 
-The task folder is removed once it's empty.
+Only empty recognized Task directories are removed. Editor workspace files and
+unrelated files outside removed checkouts remain. Registered cleanup journals its
+intent and reports partial results with [recovery guidance](docs/cleanup.md).
 
 | Flag | Description |
 |------|-------------|
 | `--delete-branch` | Also delete each removed worktree's branch (non-interactive mode). |
 | `--force` | Force removal of worktrees/branches with uncommitted or unmerged changes. |
+| `--force-worktree` | Override dirty-worktree protection only (registered Roots). |
+| `--force-branch` | Override unmerged-branch protection only (registered Roots). |
 
 ### Shell completion
 
 Task IDs complete for `list`, `vscode`, and `delete`; `delete` also completes repo and branch from the chosen task.
+Completion respects current context and `--root`; duplicate Repo names complete
+as IDs. Branch completion verifies live worktree identity.
 
 ```sh
 # zsh
@@ -172,11 +193,15 @@ Layout:
 cmd/              Cobra commands (add, list, vscode, delete, setup, completion)
 internal/config/  Config load/save and Root matching
 internal/git/     Thin wrappers over git commands
-internal/store/   SQLite identity and association foundation (command integration pending)
+internal/store/   SQLite identities, associations, operation journals, backup/restore
+internal/work/    Verified worktree lifecycle and recovery
+internal/registry/ Root/Repo registration and context selection
+internal/adopt/   Legacy import verification
 internal/task/    Pure domain logic: branch rendering, task/worktree paths
 internal/ui/      Terminal styling
 ```
 
 Domain vocabulary is in [docs/glossary.md](docs/glossary.md).
-The revamp's storage foundation and current integration boundary are described in
-[docs/storage.md](docs/storage.md).
+Storage guarantees are described in [docs/storage.md](docs/storage.md).
+Run `go build ./...`, `go vet ./...`, and `go test ./...` before committing.
+See [compatibility verification](docs/compatibility.md) for the behavior coverage.

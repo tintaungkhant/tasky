@@ -53,31 +53,12 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// Publish a complete synced file without ever replacing an existing backup.
-// Linking in the same directory gives atomic, exclusive publication on Windows
-// and Unix. Unsupported filesystems fail safely with no destination overwrite.
 func writeMappingBackup(path string, b store.MappingBackup) error {
-	f, err := os.CreateTemp(filepath.Dir(path), ".tasky-backup-*")
+	data, err := json.MarshalIndent(b, "", "  ")
 	if err != nil {
-		return fmt.Errorf("create backup: %w", err)
-	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-	encoder := json.NewEncoder(f)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(b); err != nil {
 		return fmt.Errorf("write backup: %w", err)
 	}
-	if err := f.Sync(); err != nil {
-		return fmt.Errorf("sync backup: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	if err := os.Link(f.Name(), path); err != nil {
-		return fmt.Errorf("publish backup %s without overwriting: %w; choose a new filename on a filesystem supporting hard links", path, err)
-	}
-	return nil
+	return publishNewFile(path, append(data, '\n'))
 }
 
 func readMappingBackup(path string) (store.MappingBackup, error) {
