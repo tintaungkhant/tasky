@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path/filepath"
 
 	"github.com/tintaungkhant/tasky/internal/app"
 	"github.com/tintaungkhant/tasky/internal/git"
@@ -26,17 +25,7 @@ func (s *Server) withCreationContext(w http.ResponseWriter, rootID, repoID strin
 			if repo.ID != repoID {
 				continue
 			}
-			c, err := app.OpenRegistered(s.configPath, s.cwd, rootID)
-			if err != nil {
-				registrationError(w, err)
-				return
-			}
-			defer c.Store.Close()
-			if !filepath.IsAbs(c.Config.TasksDir) {
-				writeError(w, 400, "invalid_input", fmt.Errorf("Tasks Directory must be absolute; review YAML preferences in Registration"))
-				return
-			}
-			run(c, repo)
+			s.withConfiguredContext(w, rootID, func(c *app.Context) { run(c, repo) })
 			return
 		}
 		writeOperationError(w, store.ErrNotFound)

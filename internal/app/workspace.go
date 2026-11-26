@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/tintaungkhant/tasky/internal/store"
 	"github.com/tintaungkhant/tasky/internal/task"
 	"github.com/tintaungkhant/tasky/internal/work"
 )
@@ -37,7 +38,7 @@ func WriteWorkspace(path string, ws Workspace) (WorkspaceResult, error) {
 			if readErr == nil && bytes.Equal(previous, data) {
 				return WorkspaceResult{Path: path, Current: true}, nil
 			}
-			return WorkspaceResult{}, fmt.Errorf("workspace file %s exists; preserve or move it before regenerating", path)
+			return WorkspaceResult{}, fmt.Errorf("workspace file %s exists; preserve or move it before regenerating: %w", path, store.ErrConflict)
 		}
 		return WorkspaceResult{}, fmt.Errorf("write workspace file %s: %w", path, err)
 	}
@@ -49,7 +50,25 @@ func (c *Context) GenerateWorkspace(taskID string) (WorkspaceResult, error) {
 	if err != nil {
 		return WorkspaceResult{}, err
 	}
-	wts, mappings, repos, err := c.Worktrees(t.TaskID)
+	return c.generateWorkspace(t)
+}
+
+// GenerateWorkspaceForTask selects an exact persisted identity within this Root.
+func (c *Context) GenerateWorkspaceForTask(id string) (WorkspaceResult, error) {
+	tasks, err := c.Store.ListTasks(c.Root.ID)
+	if err != nil {
+		return WorkspaceResult{}, err
+	}
+	for _, t := range tasks {
+		if t.ID == id {
+			return c.generateWorkspace(t)
+		}
+	}
+	return WorkspaceResult{}, store.ErrNotFound
+}
+
+func (c *Context) generateWorkspace(t store.Task) (WorkspaceResult, error) {
+	wts, mappings, repos, err := c.worktreesForTask(t)
 	if err != nil {
 		return WorkspaceResult{}, err
 	}

@@ -86,6 +86,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("/api/tasks/attach", s.attachWorktree)
 	mux.HandleFunc("/api/tasks/detach", s.detachWorktree)
 	mux.HandleFunc("/api/tasks/reconnect", s.reconnectWorktree)
+	mux.HandleFunc("/api/tasks/workspace", s.generateWorkspace)
 	mux.HandleFunc("/api/registration/removal", s.removalPreview)
 	mux.HandleFunc("/api/registration/remove", s.removeRoot)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

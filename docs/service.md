@@ -76,6 +76,7 @@ are outside the approved scope.
 | `POST /api/tasks/attach` | `{ Review, ReassignFrom }`; re-verifies the checkout and atomically checks the reviewed target and source mapping. Reassignment requires the source's internal Task identity. Returns the associated mapping. |
 | `POST /api/tasks/detach` | `{ RootID, Mapping }`; forgets only the exact reviewed mapping snapshot. Files and Git branches are preserved, including dirty or unavailable checkouts. |
 | `POST /api/tasks/reconnect` | `{ RootID, Mapping, Path, AcceptIdentity }`; verifies an absolute destination and reconnects the exact mapping snapshot to its original Git checkout. Explicit acceptance enrolls an unverified mapping but never overrides a recorded identity mismatch. |
+| `POST /api/tasks/workspace` | `{ RootID, TaskID }` with exact internal Task identity; generates every verified association through the shared application publisher, returning `{ Path, Current }`. Current means identical output already exists. Requires an absolute configured Tasks Directory. Differing files are preserved. |
 | `POST /api/registration/repos` | `{ RootID, Name, Path }`; registers the verified primary Git worktree, including nested/external paths. |
 | `POST /api/import` | Empty JSON object; runs shared verified legacy import against saved YAML preferences. |
 | `GET /api/registration/removal?root=…` | Exact Root ID; returns the Root and every Repo, Task, and worktree mapping that removal would forget. Pending operations block the preview. |
@@ -234,6 +235,10 @@ Switching Roots or closing a form does not cancel a submitted operation.
 
 ## Frontend development
 
+Editor workspace generation is available in Task inspection; see [editor.md](editor.md)
+for verification and preservation rules. Copy the returned path and open it in
+your editor. No executable or command is accepted by this endpoint.
+
 The frontend was scaffolded with Vite's React/TypeScript generator and shadcn's
 Radix Nova preset. The default shadcn Button and Tabs handle visual defaults and
 tab keyboard behavior; the Root selector uses a native labeled select. Tailwind
@@ -285,3 +290,8 @@ and detach it while confirming files and branches remain. Move a disposable
 worktree with Git, refresh, and reconnect its recorded mapping to the new path.
 Check explicit enrollment of an unverified mapping and rejection of a different
 checkout even with enrollment selected.
+Generate an editor workspace containing multiple worktrees, including an external
+checkout, and open the returned path in a compatible editor. Repeat generation
+to check identical output, then add user settings to the file and verify generation
+preserves it with instructions to move it aside. A replacement checkout must fail
+without publishing a partial workspace.

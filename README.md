@@ -43,7 +43,8 @@ For the local dashboard, run `tasky serve` and open its printed URL. The current
 dashboard provides Root selection, YAML preferences, registration, legacy import,
 confirmed Root mapping removal, Task search with live Git inspection, worktree
 creation, Task renaming, reviewed attachment/reassignment, detach, and reconnection.
-Editor, cleanup, recovery, and backup screens are in progress.
+Editor workspace generation is available from Task inspection. Cleanup, recovery,
+and backup screens are in progress.
 Built assets ship in the binary, so Node is only needed when changing frontend
 sources. See [the service and frontend build guide](docs/service.md).
 

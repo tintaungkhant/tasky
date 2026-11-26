@@ -108,6 +108,10 @@ func (c *Context) Worktrees(taskID string) ([]task.WorktreeEntry, map[string]sto
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	return c.worktreesForTask(t)
+}
+
+func (c *Context) worktreesForTask(t store.Task) ([]task.WorktreeEntry, map[string]store.Worktree, map[string]store.Repo, error) {
 	wts, err := c.Store.ListWorktrees(t.ID)
 	if err != nil {
 		return nil, nil, nil, err

@@ -4,6 +4,7 @@ import { request, type Root } from './api'
 import TaskCreation from './TaskCreation'
 import TaskRename from './TaskRename'
 import TaskAssociations, { type Mapping } from './TaskAssociations'
+import TaskWorkspace from './TaskWorkspace'
 
 type Inspection = {
   Task: { ID: string; RootID: string; TaskID: string; Name: string }
@@ -71,6 +72,7 @@ function RootTasks({ root }: { root: Root }) {
         {selected ? <section aria-label="Task inspection" className="space-y-4 break-words">
           <h3 className="font-medium">{selected.Task.TaskID}{selected.Task.Name ? ` — ${selected.Task.Name}` : ''}</h3>
           <TaskRename key={selected.Task.ID} root={root} task={selected.Task} onRenamed={refresh} />
+          <TaskWorkspace key={selected.Task.ID} root={root} task={selected.Task} />
           {selected.Worktrees.length === 0 && <p>No associated worktrees.</p>}
           {selected.Worktrees.map(({ Mapping, Repo, State }) => <article key={Mapping.ID} className="space-y-2 rounded-md border p-3">
             <h4 className="font-medium">Repo: {Repo.Name}</h4>
