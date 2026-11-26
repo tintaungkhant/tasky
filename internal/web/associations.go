@@ -112,8 +112,13 @@ func (s *Server) detachWorktree(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RootID  string
 		Mapping store.Worktree
+		Confirm bool
 	}
 	if !decodeRequest(w, r, &body) || !validMapping(w, mappingRequest{RootID: body.RootID, Mapping: body.Mapping}) {
+		return
+	}
+	if !body.Confirm {
+		writeError(w, 400, "invalid_input", fmt.Errorf("confirm detachment of the reviewed association; files and branches will be preserved"))
 		return
 	}
 	s.withAssociationContext(w, body.RootID, body.Mapping.RepoID, func(c *app.Context) {

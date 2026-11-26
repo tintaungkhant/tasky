@@ -40,12 +40,16 @@ it('reconnects unverified Mapping with explicit enrollment and exact Mapping ide
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/tasks/reconnect', expect.objectContaining({ method: 'POST', body: JSON.stringify({ RootID: root.ID, Mapping: unverified, Path: '/new/path', AcceptIdentity: true }) }))); expect(changed).toHaveBeenCalled()
 })
 it('detaches exact Mapping and refreshes after success', async () => {
-  const user = userEvent.setup(), changed = vi.fn(), fetch = setup(() => ({})); render(<TaskAssociations root={root} mapping={mapping} onChanged={changed} />); await user.click(screen.getByRole('button', { name: 'Detach worktree' }))
-  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/tasks/detach', expect.objectContaining({ method: 'POST', body: JSON.stringify({ RootID: root.ID, Mapping: mapping }) }))); expect(await screen.findByText(/Files and branches are preserved/)).toBeInTheDocument(); expect(changed).toHaveBeenCalled()
+  const user = userEvent.setup(), changed = vi.fn(), fetch = setup(() => ({})); render(<TaskAssociations root={root} mapping={mapping} onChanged={changed} />)
+  expect(screen.getByRole('button', { name: 'Detach worktree' })).toBeDisabled()
+  await user.click(screen.getByRole('checkbox', { name: /Confirm detachment/ }))
+  await user.click(screen.getByRole('button', { name: 'Detach worktree' }))
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/tasks/detach', expect.objectContaining({ method: 'POST', body: JSON.stringify({ RootID: root.ID, Mapping: mapping, Confirm: true }) }))); expect(await screen.findByText(/Files and branches are preserved/)).toBeInTheDocument(); expect(changed).toHaveBeenCalled()
 })
 it('keeps detach diagnostics and does not refresh after failure', async () => {
   const user = userEvent.setup(), changed = vi.fn(); setup((url) => url === '/api/tasks/detach' ? new Response(JSON.stringify({ error: { message: 'mapping is protected' } }), { status: 409 }) : [])
   render(<TaskAssociations root={root} mapping={mapping} onChanged={changed} />)
+  await user.click(screen.getByRole('checkbox', { name: /Confirm detachment/ }))
   await user.click(screen.getByRole('button', { name: 'Detach worktree' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('mapping is protected')
   expect(changed).not.toHaveBeenCalled()

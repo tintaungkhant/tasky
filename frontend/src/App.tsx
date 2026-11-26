@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { connect, listRoots, type Root } from './api'
 import Registration from './Registration'
 import Tasks from './Tasks'
+import Recovery from './Recovery'
 
 const sections = ['Tasks', 'Registration', 'Recovery', 'Backup']
 
@@ -67,7 +68,7 @@ export default function App({ connection = connect }: { connection?: () => Promi
               const values = await listRoots()
               setRoots(values)
               setRootID((current) => values.some((root) => root.ID === current) ? current : '')
-            }} /> : <>
+            }} /> : section === 'Recovery' ? <Recovery key={selected?.ID ?? 'none'} root={selected} /> : <>
             <h2 className="text-lg font-medium">{section}</h2>
             <p>{section === 'Tasks' && !selected ? 'Choose a Root above to scope Task operations.' : `${section} workflows will be added in the following dashboard tickets. Use the CLI for these operations today.`}</p>
             </>}

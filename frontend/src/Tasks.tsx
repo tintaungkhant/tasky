@@ -5,6 +5,7 @@ import TaskCreation from './TaskCreation'
 import TaskRename from './TaskRename'
 import TaskAssociations, { type Mapping } from './TaskAssociations'
 import TaskWorkspace from './TaskWorkspace'
+import TaskCleanup from './TaskCleanup'
 
 type Inspection = {
   Task: { ID: string; RootID: string; TaskID: string; Name: string }
@@ -73,6 +74,7 @@ function RootTasks({ root }: { root: Root }) {
           <h3 className="font-medium">{selected.Task.TaskID}{selected.Task.Name ? ` — ${selected.Task.Name}` : ''}</h3>
           <TaskRename key={selected.Task.ID} root={root} task={selected.Task} onRenamed={refresh} />
           <TaskWorkspace key={selected.Task.ID} root={root} task={selected.Task} />
+          <TaskCleanup key={JSON.stringify(selected.Worktrees.map((worktree) => worktree.Mapping))} root={root} mappings={selected.Worktrees.map((worktree) => worktree.Mapping)} onChanged={refresh} />
           {selected.Worktrees.length === 0 && <p>No associated worktrees.</p>}
           {selected.Worktrees.map(({ Mapping, Repo, State }) => <article key={Mapping.ID} className="space-y-2 rounded-md border p-3">
             <h4 className="font-medium">Repo: {Repo.Name}</h4>
