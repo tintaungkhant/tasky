@@ -20,6 +20,13 @@ These must pass before a commit:
 - `go vet ./...`
 - `go test ./...`
 
+For frontend changes, also run in `frontend/`:
+
+- `npm ci`
+- `npm run build` (includes TypeScript checking)
+- `npm test`
+- `npm run lint`
+
 ## Planner
 
 Tickets and backlog live in: GitHub issues (gh). Planner skills: `ryan-plan` (plan a feature), `ryan-next` (next ticket), `ryan-remember` (park an idea), `ryan-backlog` (show the backlog), `ryan-talk` (discuss only).
@@ -54,6 +61,7 @@ Approved GUI direction (2026-11-26; implementation in progress): [spec #22](http
 - Frontend: React + TypeScript + shadcn/ui + Tailwind. Built assets ship inside the Go binary; users need no Node installation or separate frontend service.
 - The dashboard covers all current CLI workflows and uses explicit Root selection. Local paths are validated in Go; Git remains authoritative and external changes appear on refresh.
 - CLI and HTTP callers share Go application behavior, including identity checks, cleanup protections, and recovery. The local service protects requests from unrelated websites.
+- Keep dashboard visuals plain and functional; reuse generated shadcn/ui components and native controls before adding custom UI code (2026-11-26).
 - Desktop packaging, remote access, user accounts, cloud sync, terminals, and code editing are outside this GUI scope. Existing Git-operation and integration exclusions below still apply.
 
 ### Out of scope
@@ -68,7 +76,9 @@ Features deliberately left out or removed. Do not add them back without asking.
 
 Do not hand-edit these; a regenerate overwrites hand edits. Regenerate with the listed command.
 
-- (none yet)
+- `internal/web/dist/`: embedded production dashboard; regenerate with `cd frontend` then `npm ci` and `npm run build`. Commit the output so Go-only builds work.
+- `frontend/package-lock.json`: npm dependency lock; regenerate through `npm install` when dependencies change.
+- `frontend/src/components/ui/`, `frontend/src/lib/utils.ts`: shadcn/ui templates; regenerate in `frontend/` with `npx shadcn@4.23.1 add button tabs --overwrite --yes`.
 
 ## Deploy
 
