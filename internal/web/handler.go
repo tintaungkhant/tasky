@@ -1,9 +1,7 @@
 package web
 
 import (
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,11 +57,10 @@ func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/{$}", func(w http.ResponseWriter, r *http.Request) {
-		if !requireMethod(w, r, http.MethodGet) {
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.WriteString(w, bootstrapPage)
+		dashboardFile(w, r, "index.html")
+	})
+	mux.HandleFunc("/assets/", func(w http.ResponseWriter, r *http.Request) {
+		dashboardFile(w, r, strings.TrimPrefix(r.URL.Path, "/"))
 	})
 	mux.HandleFunc("/api/session", s.session)
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
@@ -75,11 +72,11 @@ func (s *Server) handler() http.Handler {
 		}{"ok"})
 	})
 	mux.HandleFunc("/api/context", s.context)
+	mux.HandleFunc("/api/roots", s.roots)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Errorf("endpoint not found"))
 	})
-	hash := sha256.Sum256([]byte(bootstrapScript))
-	csp := "default-src 'none'; script-src 'sha256-" + base64.StdEncoding.EncodeToString(hash[:]) + "'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+	csp := "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 	host := strings.TrimPrefix(s.origin, "http://")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -116,6 +113,31 @@ func (s *Server) handler() http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) roots(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	if r.URL.RawQuery != "" {
+		writeError(w, http.StatusBadRequest, "invalid_input", fmt.Errorf("Roots listing does not accept query parameters"))
+		return
+	}
+	source, err := store.Open(app.DatabasePath(s.configPath))
+	if err != nil {
+		writeOperationError(w, err)
+		return
+	}
+	defer source.Close()
+	roots, err := source.ListRoots()
+	if err != nil {
+		writeOperationError(w, err)
+		return
+	}
+	if roots == nil {
+		roots = []store.Root{}
+	}
+	writeJSON(w, http.StatusOK, roots)
 }
 
 func (s *Server) session(w http.ResponseWriter, r *http.Request) {

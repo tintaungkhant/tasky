@@ -39,6 +39,11 @@ cd tasky
 go build -o tasky .
 ```
 
+For the local dashboard, run `tasky serve` and open its printed URL. The current
+shell provides Root selection and navigation; workflow screens are in progress.
+Built assets ship in the binary, so Node is only needed when changing frontend
+sources. See [the service and frontend build guide](docs/service.md).
+
 ## Quick start
 
 ```sh
