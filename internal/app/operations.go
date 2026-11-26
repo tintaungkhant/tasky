@@ -70,6 +70,9 @@ func (c *Context) Create(req CreateRequest) (CreatedWorktree, error) {
 		return CreatedWorktree{}, err
 	}
 	path, err := m.Create(t, ctx.Repo, c.Config.TasksDir, branch, base)
+	if err != nil {
+		return CreatedWorktree{Path: path, Branch: branch}, fmt.Errorf("Task %q (identity %s) exists; worktree creation did not complete: %w; refresh Task inspection and review `tasky pending --root %s` before retrying", t.TaskID, t.ID, err, c.Root.ID)
+	}
 	return CreatedWorktree{Path: path, Branch: branch}, err
 }
 

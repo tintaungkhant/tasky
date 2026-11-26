@@ -79,6 +79,9 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("/api/registration/repos", s.registerRepo)
 	mux.HandleFunc("/api/repos", s.repos)
 	mux.HandleFunc("/api/tasks", s.tasks)
+	mux.HandleFunc("/api/tasks/options", s.creationOptions)
+	mux.HandleFunc("/api/tasks/create", s.createWorktree)
+	mux.HandleFunc("/api/tasks/rename", s.renameTask)
 	mux.HandleFunc("/api/registration/removal", s.removalPreview)
 	mux.HandleFunc("/api/registration/remove", s.removeRoot)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
