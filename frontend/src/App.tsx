@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { connect, listRoots, type Root } from './api'
 import Registration from './Registration'
+import Tasks from './Tasks'
 
 const sections = ['Tasks', 'Registration', 'Recovery', 'Backup']
 
@@ -62,7 +63,7 @@ export default function App({ connection = connect }: { connection?: () => Promi
             </TabsList>
           </div>
           {sections.map((section) => <TabsContent key={section} value={section} className="space-y-2 rounded-md border p-4">
-            {section === 'Registration' ? <Registration key={rootID} root={selected} onChanged={async () => {
+            {section === 'Tasks' ? <Tasks root={selected} /> : section === 'Registration' ? <Registration key={rootID} root={selected} onChanged={async () => {
               const values = await listRoots()
               setRoots(values)
               setRootID((current) => values.some((root) => root.ID === current) ? current : '')

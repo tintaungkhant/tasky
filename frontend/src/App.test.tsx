@@ -22,7 +22,9 @@ describe('dashboard shell', () => {
 
   it('waits for the session, requires explicit identity selection, and supports keyboard navigation', async () => {
     const user = userEvent.setup()
-    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(roots)))
+    const fetch = vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(JSON.stringify(
+      url === '/api/roots' ? roots : url === '/api/preferences' ? { Roots: [] } : [],
+    ))))
     vi.stubGlobal('fetch', fetch)
     let connect!: () => void
     const connection = new Promise<void>((resolve) => { connect = resolve })
@@ -45,6 +47,7 @@ describe('dashboard shell', () => {
   it('shows empty Roots and refreshes without keeping a removed selection', async () => {
     const user = userEvent.setup()
     const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(roots)))
+      .mockResolvedValueOnce(new Response('[]'))
       .mockResolvedValueOnce(new Response('[]'))
     vi.stubGlobal('fetch', fetch)
     render(<App connection={() => Promise.resolve()} />)
