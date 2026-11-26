@@ -63,6 +63,14 @@ Removal receives the expected mapping snapshot; journal checks still reject stal
 ownership or location changes. CLI target selection and prompts remain adapters;
 worktree identity checks and dirty/unmerged protections remain in `work`.
 
+Dashboard cleanup reviews bind exact mapping snapshots to live branch, revision,
+and Repo identity. Application preflight rechecks the entire selection before any
+removal; the domain rechecks each target before Store reserves durable intent.
+Batch results report completed, failed, and unattempted targets without hiding
+partial completion. CLI removal shares the same domain checks. Recovery lists
+persisted creation/cleanup journals and calls the existing scoped `Context.Recover`
+operation, without reimplementing recovery or requiring YAML preferences.
+
 ## Files and diagnostics
 
 Workspace generation returns its path and whether identical output already

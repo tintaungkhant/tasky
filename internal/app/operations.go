@@ -3,7 +3,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 
@@ -151,43 +150,6 @@ func (c *Context) location(path string) string {
 	return filepath.Join(c.Cwd, path)
 }
 
-type RemoveOptions struct{ DeleteBranch, ForceWorktree, ForceBranch bool }
-
-// Remove uses the expected mapping snapshot so stale selections cannot remove
-// a checkout that was reassigned or reconnected after the caller inspected it.
-func (c *Context) Remove(expected store.Worktree, options RemoveOptions) error {
-	tasks, err := c.Store.ListTasks(c.Root.ID)
-	if err != nil {
-		return err
-	}
-	for _, t := range tasks {
-		if t.ID != expected.TaskID {
-			continue
-		}
-		repos, err := c.Store.ListRepos(c.Root.ID)
-		if err != nil {
-			return err
-		}
-		for _, repo := range repos {
-			if repo.ID != expected.RepoID {
-				continue
-			}
-			if err := (work.Manager{Store: c.Store}).Remove(repo, expected, options.DeleteBranch, options.ForceWorktree, options.ForceBranch); err != nil {
-				return err
-			}
-			// Never recursively remove a Task directory or its editor/user files.
-			parent := filepath.Dir(expected.Path)
-			owned := work.TaskDirectory(c.Config.TasksDir, t.ID)
-			legacy := filepath.Join(c.Config.TasksDir, task.TaskDirName(t.TaskID, t.Name))
-			if parent == owned || parent == legacy {
-				_ = os.Remove(parent)
-			}
-			return nil
-		}
-	}
-	return fmt.Errorf("worktree mapping does not belong to Root %s", c.Root.Name)
-}
-
 type RecoveryOptions struct{ Forget, ForceWorktree, ForceBranch bool }
 
 // Recover returns true only when a cleanup was completed (rather than forgotten).
@@ -234,5 +196,5 @@ func (c *Context) Recover(id string, options RecoveryOptions) (bool, error) {
 			}
 		}
 	}
-	return false, fmt.Errorf("pending operation %q not found; use `tasky pending`", id)
+	return false, fmt.Errorf("pending operation %q not found; use `tasky pending`: %w", id, store.ErrNotFound)
 }

@@ -181,7 +181,7 @@ func TestDetachReviewedRejectsStaleSnapshot(t *testing.T) {
 	if _, err := db.Attach(f.root.ID, "T-new", "New", f.repos[0].ID, path, old.TaskID, identity); err != nil {
 		t.Fatal(err)
 	}
-	w := f.call(t, http.MethodPost, "/api/tasks/detach", map[string]any{"RootID": f.root.ID, "Mapping": old})
+	w := f.call(t, http.MethodPost, "/api/tasks/detach", map[string]any{"RootID": f.root.ID, "Mapping": old, "Confirm": true})
 	if w.Code != http.StatusConflict {
 		t.Fatalf("stale detach status %d: %s", w.Code, w.Body.String())
 	}
@@ -210,7 +210,7 @@ func TestAssociationMutationReportsPendingCleanupRecovery(t *testing.T) {
 	if _, err := db.ReserveCleanup(mapping, "external", "revision", true, false, false); err != nil {
 		t.Fatal(err)
 	}
-	w := f.call(t, http.MethodPost, "/api/tasks/detach", map[string]any{"RootID": f.root.ID, "Mapping": mapping})
+	w := f.call(t, http.MethodPost, "/api/tasks/detach", map[string]any{"RootID": f.root.ID, "Mapping": mapping, "Confirm": true})
 	if w.Code != http.StatusConflict || !strings.Contains(strings.ToLower(w.Body.String()), "recover") {
 		t.Fatalf("pending cleanup response: %d %s", w.Code, w.Body.String())
 	}
@@ -324,5 +324,16 @@ func TestAttachmentPreviewValidatesRequestBoundary(t *testing.T) {
 	wrongOrigin.Set("Origin", "http://evil.test")
 	if w := request(t, f.s, http.MethodPost, "/api/tasks/attach/preview", wrongOrigin, `{"RootID":"`+f.root.ID+`"}`); w.Code != http.StatusForbidden {
 		t.Errorf("wrong Origin status %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDetachRequiresConfirmation(t *testing.T) {
+	s := newTestServer(t)
+	h := authorizedHeaders(s)
+	h.Set("Content-Type", "application/json")
+	body, _ := json.Marshal(map[string]any{"RootID": "root", "Mapping": store.Worktree{ID: "mapping", TaskID: "task", RepoID: "repo", Path: t.TempDir(), Identity: "identity"}})
+	w := request(t, s, http.MethodPost, "/api/tasks/detach", h, string(body))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("unconfirmed detach: %d %s", w.Code, w.Body.String())
 	}
 }

@@ -12,26 +12,55 @@ import (
 )
 
 func (m Manager) Remove(repo store.Repo, wt store.Worktree, deleteBranch, forceWorktree, forceBranch bool) error {
-	state := m.Inspect(repo, wt)
-	if state.Status != "ok" {
-		return fmt.Errorf("refusing cleanup of %s [%s]: %s", wt.Path, state.Status, state.Detail)
-	}
-	branch, err := git.CurrentBranch(wt.Path)
+	review, err := m.ReviewRemoval(repo, wt)
 	if err != nil {
 		return err
 	}
+	return m.executeRemoval(repo, review, deleteBranch, forceWorktree, forceBranch)
+}
+
+type RemovalReview struct {
+	Mapping                        store.Worktree
+	Branch, Revision, RepoIdentity string
+}
+
+func (m Manager) ReviewRemoval(repo store.Repo, wt store.Worktree) (RemovalReview, error) {
+	state := m.Inspect(repo, wt)
+	if state.Status != "ok" {
+		return RemovalReview{}, fmt.Errorf("refusing cleanup of %s [%s]: %s: %w", wt.Path, state.Status, state.Detail, store.ErrConflict)
+	}
+	branch, err := git.CurrentBranch(wt.Path)
+	if err != nil {
+		return RemovalReview{}, err
+	}
 	revision := ""
-	if branch != "" && deleteBranch {
+	if branch != "" {
 		revision, err = git.BranchRevision(repo.Path, branch)
 		if err != nil {
-			return err
+			return RemovalReview{}, err
 		}
 	}
 	repoIdentity, err := git.WorktreeIdentity(repo.Path)
 	if err != nil {
+		return RemovalReview{}, err
+	}
+	return RemovalReview{Mapping: wt, Branch: branch, Revision: revision, RepoIdentity: repoIdentity}, nil
+}
+
+func (m Manager) RemoveReviewed(repo store.Repo, review RemovalReview, deleteBranch, forceWorktree, forceBranch bool) error {
+	current, err := m.ReviewRemoval(repo, review.Mapping)
+	if err != nil {
 		return err
 	}
-	c, err := m.Store.ReserveCleanup(wt, branch, revision, deleteBranch, forceWorktree, forceBranch, repoIdentity)
+	if current != review {
+		return fmt.Errorf("cleanup review is stale: branch, revision, or Repo identity changed; review again: %w", store.ErrConflict)
+	}
+	return m.executeRemoval(repo, review, deleteBranch, forceWorktree, forceBranch)
+}
+
+func (m Manager) executeRemoval(repo store.Repo, review RemovalReview, deleteBranch, forceWorktree, forceBranch bool) error {
+	wt := review.Mapping
+	c, err := m.Store.ReserveCleanup(wt, review.Branch, review.Revision, deleteBranch, forceWorktree, forceBranch, review.RepoIdentity)
 	if err != nil {
 		return err
 	}

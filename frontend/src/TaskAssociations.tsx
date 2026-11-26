@@ -74,17 +74,21 @@ function AttachForm({ root, onChanged }: { root: Root; onChanged: () => void }) 
 }
 
 function MappingActions({ root, mapping, onChanged }: { root: Root; mapping: Mapping; onChanged: () => void }) {
+  const [confirmDetach, setConfirmDetach] = useState(false)
   const [path, setPath] = useState('')
   const [acceptIdentity, setAcceptIdentity] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   return <div className="space-y-2">
-    <Button type="button" variant="outline" disabled={busy} onClick={async () => {
+    <p>Detach target: {mapping.Path} — Mapping {mapping.ID}, Task {mapping.TaskID}, Repo {mapping.RepoID}, Root {root.ID}.</p>
+    <label className="block"><input type="checkbox" disabled={busy} checked={confirmDetach} onChange={(event) => setConfirmDetach(event.target.checked)} /> Confirm detachment of this association only; keep files and branches</label>
+    <Button type="button" variant="outline" disabled={busy || !confirmDetach} onClick={async () => {
+      if (busy || !confirmDetach) return
       setBusy(true); setError(''); setMessage('')
-      try { await request('/api/tasks/detach', 'POST', { RootID: root.ID, Mapping: mapping }); setMessage('Mapping detached. Files and branches are preserved.'); onChanged() }
+      try { await request('/api/tasks/detach', 'POST', { RootID: root.ID, Mapping: mapping, Confirm: true }); setMessage('Mapping detached. Files and branches are preserved.'); onChanged() }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'Detach failed.') }
-      finally { setBusy(false) }
+      finally { setBusy(false); setConfirmDetach(false) }
     }}>Detach worktree</Button>
     <p>Detach removes the Tasky association only. Files, branches, and the Git worktree are preserved.</p>
     <form aria-label="Reconnect worktree" className="space-y-2" onSubmit={async (event) => {

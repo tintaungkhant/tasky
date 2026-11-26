@@ -20,10 +20,11 @@ remain independently selectable. Selection starts empty and is cleared if a
 refresh removes the selected Root. Registration supports YAML preferences,
 Root/Repo registration, verified legacy import, and confirmed Root mapping
 removal. The Tasks tab searches registered Tasks, inspects live Git state,
-creates worktrees, renames Tasks, attaches/detaches checkouts, and reconnects moved
-worktrees. Editor, cleanup, and recovery screens follow in the GUI plan,
-[spec #22](https://github.com/tintaungkhant/tasky/issues/22); use the existing CLI
-commands for those operations today. Production assets are embedded in the Go
+creates worktrees, renames Tasks, attaches/detaches checkouts, reconnects moved
+worktrees, generates editor workspaces, and reviews worktree cleanup. Recovery
+lists and resolves durable pending operations. Mapping backup remains the final
+GUI ticket in [spec #22](https://github.com/tintaungkhant/tasky/issues/22).
+Production assets are embedded in the Go
 binary. Users need no frontend build, Node installation, or separate service.
 
 ## Local access and sessions
@@ -74,9 +75,13 @@ are outside the approved scope.
 | `POST /api/tasks/rename` | `{ RootID, ID, Name }`; renames an exact internal Task ID in the selected Root. Name is required but may be empty. Preserves branches, paths, and associations. |
 | `POST /api/tasks/attach/preview` | `{ RootID, RepoID, TaskID, Name, Path }`; verifies an absolute checkout path and returns an attachment review with canonical path, Git identity, target internal identity (empty for a new Task), and current source mapping/Task/Root, or null source fields if unowned. |
 | `POST /api/tasks/attach` | `{ Review, ReassignFrom }`; re-verifies the checkout and atomically checks the reviewed target and source mapping. Reassignment requires the source's internal Task identity. Returns the associated mapping. |
-| `POST /api/tasks/detach` | `{ RootID, Mapping }`; forgets only the exact reviewed mapping snapshot. Files and Git branches are preserved, including dirty or unavailable checkouts. |
+| `POST /api/tasks/detach` | `{ RootID, Mapping, Confirm: true }`; explicitly confirms forgetting only the exact reviewed mapping snapshot. Files and Git branches are preserved, including dirty or unavailable checkouts. |
 | `POST /api/tasks/reconnect` | `{ RootID, Mapping, Path, AcceptIdentity }`; verifies an absolute destination and reconnects the exact mapping snapshot to its original Git checkout. Explicit acceptance enrolls an unverified mapping but never overrides a recorded identity mismatch. |
 | `POST /api/tasks/workspace` | `{ RootID, TaskID }` with exact internal Task identity; generates every verified association through the shared application publisher, returning `{ Path, Current }`. Current means identical output already exists. Requires an absolute configured Tasks Directory. Differing files are preserved. |
+| `POST /api/tasks/cleanup/preview` | `{ RootID, Mappings, Options }`; verifies exact mapping snapshots and live Git state, returning `{ RootID, Targets, Options }`. Each target contains `Mapping`, `Branch`, `Revision`, and `RepoIdentity`. Options are separate `DeleteBranch`, `ForceWorktree`, and `ForceBranch` booleans. |
+| `POST /api/tasks/cleanup` | `{ Review, Confirm: true }`; rechecks the whole selection before starting, then uses shared journaled removal. Returns `{ Completed, Failed, Error, Remaining }`; partial failure stops later targets, retains durable recovery intent, and includes full diagnostics. Stale preflight fails before removal. |
+| `GET /api/pending?root=<ID>` | Lists the selected Root's `Creations` and `Cleanups` with durable IDs, paths, branches, phases, and cleanup options. |
+| `POST /api/recover` | `{ RootID, ID, Options, Confirm: true }`; recovers or forgets the exact scoped pending operation. Options are `Forget`, `ForceWorktree`, `ForceBranch`; forgetting cannot be combined with overrides, and creation recovery accepts no cleanup overrides. |
 | `POST /api/registration/repos` | `{ RootID, Name, Path }`; registers the verified primary Git worktree, including nested/external paths. |
 | `POST /api/import` | Empty JSON object; runs shared verified legacy import against saved YAML preferences. |
 | `GET /api/registration/removal?root=…` | Exact Root ID; returns the Root and every Repo, Task, and worktree mapping that removal would forget. Pending operations block the preview. |
@@ -198,7 +203,7 @@ Root removal shows names, paths, IDs, and counts for all affected mappings, then
 requires an explicit checkbox before confirmation. SQLite compares the exact
 preview and deletes in one writer transaction. New, renamed, reassigned, or moved
 mappings invalidate the preview. The dashboard refuses removal with pending
-creation or cleanup intent; inspect/recover it through the CLI first. Removal
+creation or cleanup intent; inspect/recover it in Recovery or through the CLI first. Removal
 preserves source files, worktree directories, branches, YAML preferences, and
 editor workspace files. Re-registering cannot reconstruct forgotten identities.
 
@@ -228,8 +233,8 @@ to the original checkout; move/repair Git worktree registration outside Tasky
 first. A mapping without a recorded identity requires explicit review and
 acceptance to enroll the checkout. That acceptance cannot override a known
 identity mismatch. Snapshot checks reject stale detach/reconnect requests.
-Pending-operation errors preserve their recovery instructions; use `tasky pending`
-and `tasky recover` until the recovery dashboard is available. These association
+Pending-operation errors preserve their recovery instructions; use Recovery or
+`tasky pending` and `tasky recover` before retrying. These association
 operations use persisted registration and do not depend on YAML creation settings.
 Switching Roots or closing a form does not cancel a submitted operation.
 
@@ -280,8 +285,8 @@ Root, check Registration's YAML add/edit/remove, import, and Root/Repo forms;
 inspect the full removal preview and checkbox before forgetting mappings. In Tasks,
 search a Unicode name, select a Task with the keyboard, change its Git branch or
 files externally, and click Refresh Tasks. Check detached HEAD and unavailable
-location guidance on disposable worktrees. Recovery and Backup content still
-explains which workflows are coming next. In a disposable Root, use Add worktree
+location guidance on disposable worktrees. Backup content still
+explains the remaining workflow. In a disposable Root, use Add worktree
 with a new templated branch, an existing branch, and a verbatim branch/base.
 Repeat across Repos, then rename the Task and confirm paths and branches stay
 unchanged. A failed creation must show its error and any pending recovery guidance.
@@ -295,3 +300,12 @@ checkout, and open the returned path in a compatible editor. Repeat generation
 to check identical output, then add user settings to the file and verify generation
 preserves it with instructions to move it aside. A replacement checkout must fail
 without publishing a partial workspace.
+For cleanup, select disposable checkouts and review exact paths, branch effects,
+and the separate overrides before confirming. Change a selection or option and
+check that consent resets. Trigger dirty-worktree protection after a clean target
+completes, read the partial result, then open Recovery. Restart the service and
+confirm the pending operation remains; recover with only the intended override.
+Verify unmerged-branch protection separately, replacement identity refusal, and
+preservation of user-edited workspace files outside removed checkouts. Confirm
+Forget intent leaves files, mappings, and branches intact. Use Tab through all
+confirmation controls and check loading, empty, error, and retry states.
