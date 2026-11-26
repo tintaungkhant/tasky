@@ -195,6 +195,7 @@ internal/config/  Config load/save and Root matching
 internal/git/     Thin wrappers over git commands
 internal/store/   SQLite identities, associations, operation journals, backup/restore
 internal/work/    Verified worktree lifecycle and recovery
+internal/app/     Shared application operations and structured results
 internal/registry/ Root/Repo registration and context selection
 internal/adopt/   Legacy import verification
 internal/task/    Pure domain logic: branch rendering, task/worktree paths
@@ -203,5 +204,6 @@ internal/ui/      Terminal styling
 
 Domain vocabulary is in [docs/glossary.md](docs/glossary.md).
 Storage guarantees are described in [docs/storage.md](docs/storage.md).
+Application ownership is described in [docs/architecture.md](docs/architecture.md).
 Run `go build ./...`, `go vet ./...`, and `go test ./...` before committing.
 See [compatibility verification](docs/compatibility.md) for the behavior coverage.

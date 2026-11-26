@@ -1,27 +1,19 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"slices"
 
 	"github.com/spf13/cobra"
+	"github.com/tintaungkhant/tasky/internal/app"
 	"github.com/tintaungkhant/tasky/internal/config"
 	"github.com/tintaungkhant/tasky/internal/git"
-	"github.com/tintaungkhant/tasky/internal/registry"
 	"github.com/tintaungkhant/tasky/internal/store"
 	"github.com/tintaungkhant/tasky/internal/task"
 	"github.com/tintaungkhant/tasky/internal/work"
 )
 
-type storedContext struct {
-	registry.Registry
-	Root   store.Root
-	Config config.Root
-	Cwd    string
-}
+type storedContext = app.Context
 
 func init() {
 	rename := &cobra.Command{Use: "rename <task-id> <name>", Short: "Rename a Task without changing its identity, branches, or paths", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
@@ -30,11 +22,7 @@ func init() {
 			return err
 		}
 		defer c.Store.Close()
-		t, err := c.Store.FindTask(c.Root.ID, args[0])
-		if err != nil {
-			return err
-		}
-		return c.Store.RenameTask(t.ID, args[1])
+		return c.Rename(args[0], args[1])
 	}}
 	pending := &cobra.Command{Use: "pending", Short: "List unfinished worktree creations and cleanup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		c, err := requiredStored(cmd)
@@ -64,57 +52,14 @@ func init() {
 			return err
 		}
 		defer c.Store.Close()
-		cleanups, err := c.Store.ListCleanups(c.Root.ID)
-		if err != nil {
-			return err
+		forget, _ := cmd.Flags().GetBool("forget")
+		fw, _ := cmd.Flags().GetBool("force-worktree")
+		fb, _ := cmd.Flags().GetBool("force-branch")
+		cleanup, err := c.Recover(args[0], app.RecoveryOptions{Forget: forget, ForceWorktree: fw, ForceBranch: fb})
+		if err == nil && cleanup {
+			cmd.Printf("Cleanup %s completed.\n", args[0])
 		}
-		for _, op := range cleanups {
-			if op.ID != args[0] {
-				continue
-			}
-			forget, _ := cmd.Flags().GetBool("forget")
-			if forget {
-				return c.Store.ForgetCleanup(op.ID)
-			}
-			repos, err := c.Store.ListRepos(c.Root.ID)
-			if err != nil {
-				return err
-			}
-			for _, repo := range repos {
-				if repo.ID == op.RepoID {
-					fw, _ := cmd.Flags().GetBool("force-worktree")
-					fb, _ := cmd.Flags().GetBool("force-branch")
-					if err := (work.Manager{Store: c.Store}).RecoverCleanup(repo, op, fw, fb); err != nil {
-						return err
-					}
-					cmd.Printf("Cleanup %s completed.\n", op.ID)
-					return nil
-				}
-			}
-		}
-		operations, err := c.Store.ListCreations(c.Root.ID)
-		if err != nil {
-			return err
-		}
-		for _, op := range operations {
-			if op.ID != args[0] {
-				continue
-			}
-			forget, _ := cmd.Flags().GetBool("forget")
-			if forget {
-				return c.Store.ForgetCreation(op.ID)
-			}
-			repos, err := c.Store.ListRepos(c.Root.ID)
-			if err != nil {
-				return err
-			}
-			for _, repo := range repos {
-				if repo.ID == op.RepoID {
-					return (work.Manager{Store: c.Store}).Recover(op, repo)
-				}
-			}
-		}
-		return fmt.Errorf("pending operation %q not found; use `tasky pending`", args[0])
+		return err
 	}}
 	recover.Flags().Bool("forget", false, "forget operation intent only; preserve all files, mappings, worktrees, and branches")
 	recover.Flags().Bool("force-worktree", false, "override dirty-worktree protection for pending cleanup")
@@ -135,123 +80,17 @@ func requiredStored(cmd *cobra.Command) (*storedContext, error) {
 	return c, err
 }
 
-// Unadopted YAML Roots retain the legacy workflow. A matching registered Root
-// always uses persisted identity; errors never silently fall back to names.
 func registeredContext(cmd *cobra.Command) (*storedContext, error) {
 	selector, _ := cmd.Flags().GetString("root")
 	path, err := config.Path()
 	if err != nil {
 		return nil, err
 	}
-	dbPath := filepath.Join(filepath.Dir(path), "tasky.sqlite3")
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) && selector == "" {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	s, err := store.Open(dbPath)
-	if err != nil {
-		return nil, err
-	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		s.Close()
 		return nil, err
 	}
-	r := registry.Registry{Store: s}
-	root, selectErr := r.ResolveRoot(cwd, selector)
-	cfg, err := config.Load()
-	if err != nil {
-		s.Close()
-		return nil, err
-	}
-	if selectErr != nil {
-		if selector == "" {
-			legacy, legacyErr := cfg.MatchRoot(cwd)
-			if legacyErr == nil {
-				roots, err := s.ListRoots()
-				if err != nil {
-					s.Close()
-					return nil, err
-				}
-				registered := false
-				for _, candidate := range roots {
-					if sameLocation(candidate.Path, legacy.Path) {
-						registered = true
-					}
-				}
-				if !registered {
-					s.Close()
-					return nil, nil
-				}
-			}
-		}
-		s.Close()
-		return nil, selectErr
-	}
-	settings := config.Root{Name: root.Name, Path: root.Path, TasksDir: filepath.Join(root.Path, "tasks"), BranchTemplate: "{branch}"}
-	matches := 0
-	for _, configured := range cfg.Roots {
-		if sameLocation(configured.Path, root.Path) {
-			settings = configured
-			matches++
-		}
-	}
-	if matches > 1 {
-		s.Close()
-		return nil, fmt.Errorf("multiple YAML settings match Root %q; review `tasky setup`", root.Name)
-	}
-	if settings.TasksDir == "" {
-		s.Close()
-		return nil, fmt.Errorf("Tasks Directory is empty; review `tasky setup`")
-	}
-	return &storedContext{Registry: r, Root: root, Config: settings, Cwd: cwd}, nil
-}
-
-func sameLocation(a, b string) bool {
-	x, err := os.Stat(a)
-	if err != nil {
-		return false
-	}
-	y, err := os.Stat(b)
-	return err == nil && os.SameFile(x, y)
-}
-
-func (c *storedContext) entries() ([]task.Entry, error) {
-	tasks, err := c.Store.ListTasks(c.Root.ID)
-	if err != nil {
-		return nil, err
-	}
-	var entries []task.Entry
-	for _, t := range tasks {
-		entries = append(entries, task.Entry{ID: t.TaskID, Name: t.Name})
-	}
-	return entries, nil
-}
-
-func (c *storedContext) worktrees(taskID string) ([]task.WorktreeEntry, map[string]store.Worktree, map[string]store.Repo, error) {
-	t, err := c.Store.FindTask(c.Root.ID, taskID)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	wts, err := c.Store.ListWorktrees(t.ID)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	repos, err := c.Store.ListRepos(c.Root.ID)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	byRepo, byPath := make(map[string]store.Repo), make(map[string]store.Worktree)
-	for _, repo := range repos {
-		byRepo[repo.ID] = repo
-	}
-	var entries []task.WorktreeEntry
-	for _, wt := range wts {
-		entries = append(entries, task.WorktreeEntry{RepoName: byRepo[wt.RepoID].Name, Path: wt.Path})
-		byPath[wt.Path] = wt
-	}
-	return entries, byPath, byRepo, nil
+	return app.OpenRegistered(path, cwd, selector)
 }
 
 func runStoredAdd(cmd *cobra.Command, args []string, c *storedContext) error {
@@ -291,7 +130,7 @@ func runStoredAdd(cmd *cobra.Command, args []string, c *storedContext) error {
 	if err != nil {
 		return err
 	}
-	entries, err := c.entries()
+	entries, err := c.Entries()
 	if err != nil {
 		return err
 	}
@@ -334,10 +173,8 @@ func runStoredAdd(cmd *cobra.Command, args []string, c *storedContext) error {
 			return err
 		}
 	}
-	if !asIs && !slices.Contains(branches, branch) {
-		branch = task.RenderBranch(c.Config.BranchTemplate, taskID, name, branch)
-	}
-	if err := git.ValidateBranch(ctx.Repo.Path, branch); err != nil {
+	branch, err = c.Branch(ctx.Repo, taskID, name, branch, asIs)
+	if err != nil {
 		return err
 	}
 	if interactive {
@@ -349,16 +186,11 @@ func runStoredAdd(cmd *cobra.Command, args []string, c *storedContext) error {
 			return fmt.Errorf("aborted")
 		}
 	}
-	m := work.Manager{Store: c.Store}
-	t, err := m.EnsureTask(c.Root.ID, taskID, name)
+	result, err := c.Create(app.CreateRequest{TaskID: taskID, Name: name, Repo: ctx.Repo.ID, Branch: branch, Base: base, AsIs: true})
 	if err != nil {
 		return err
 	}
-	path, err := m.Create(t, ctx.Repo, c.Config.TasksDir, branch, base)
-	if err != nil {
-		return err
-	}
-	cmd.Printf("Created worktree at %s (branch %s)\n", path, branch)
+	cmd.Printf("Created worktree at %s (branch %s)\n", result.Path, result.Branch)
 	return nil
 }
 
@@ -368,7 +200,7 @@ func selectedTask(cmd *cobra.Command, args []string, c *storedContext) (store.Ta
 		id = args[0]
 	}
 	if id == "" {
-		entries, err := c.entries()
+		entries, err := c.Entries()
 		if err != nil {
 			return store.Task{}, err
 		}
@@ -380,15 +212,11 @@ func selectedTask(cmd *cobra.Command, args []string, c *storedContext) (store.Ta
 			return store.Task{}, err
 		}
 	}
-	t, err := c.Store.FindTask(c.Root.ID, id)
-	if errors.Is(err, store.ErrNotFound) {
-		return store.Task{}, fmt.Errorf("Task %q not found in Root %s", id, c.Root.Name)
-	}
-	return t, err
+	return c.Task(id)
 }
 
 func runStoredList(cmd *cobra.Command, args []string, c *storedContext) error {
-	entries, err := c.entries()
+	entries, err := c.Entries()
 	if err != nil {
 		return err
 	}
@@ -405,7 +233,7 @@ func runStoredList(cmd *cobra.Command, args []string, c *storedContext) error {
 	}
 	for _, entry := range entries {
 		cmd.Println(entry.Label())
-		wts, mappings, repos, err := c.worktrees(entry.ID)
+		wts, mappings, repos, err := c.Worktrees(entry.ID)
 		if err != nil {
 			return err
 		}

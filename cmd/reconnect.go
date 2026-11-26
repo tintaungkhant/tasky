@@ -1,11 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"path/filepath"
-
 	"github.com/spf13/cobra"
-	"github.com/tintaungkhant/tasky/internal/work"
 )
 
 func init() {
@@ -15,26 +11,13 @@ func init() {
 			return err
 		}
 		defer c.Store.Close()
-		_, mappings, repos, err := c.worktrees(args[0])
+		accept, _ := cmd.Flags().GetBool("accept-identity")
+		wt, err := c.Reconnect(args[0], args[1], args[2], accept)
 		if err != nil {
 			return err
 		}
-		old, err := filepath.Abs(args[1])
-		if err != nil {
-			return err
-		}
-		for _, wt := range mappings {
-			if filepath.Clean(wt.Path) != old {
-				continue
-			}
-			accept, _ := cmd.Flags().GetBool("accept-identity")
-			if err := (work.Manager{Store: c.Store}).Reconnect(repos[wt.RepoID], wt, args[2], accept); err != nil {
-				return err
-			}
-			cmd.Printf("Reconnected worktree %s. Task ownership, files, and branches are unchanged.\n", wt.ID)
-			return nil
-		}
-		return fmt.Errorf("no mapping at %s for Task %s; inspect tasky list before retrying", old, args[0])
+		cmd.Printf("Reconnected worktree %s. Task ownership, files, and branches are unchanged.\n", wt.ID)
+		return nil
 	}}
 	command.Flags().String("root", "", "registered Root name or ID")
 	command.Flags().Bool("accept-identity", false, "enroll a reviewed legacy mapping that has no recorded Git identity")

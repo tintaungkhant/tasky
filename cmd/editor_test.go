@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/tintaungkhant/tasky/internal/app"
 	"github.com/tintaungkhant/tasky/internal/work"
 )
 
@@ -93,7 +94,7 @@ func TestEditorLifecycleAndGitIndependence(t *testing.T) {
 			if !filepath.IsAbs(resolved) {
 				resolved = filepath.Join(filepath.Dir(path), resolved)
 			}
-			if sameLocation(resolved, wt.Path) {
+			if app.SameLocation(resolved, wt.Path) {
 				found = true
 			}
 		}
@@ -164,7 +165,7 @@ func TestConcurrentWorkspacePublication(t *testing.T) {
 	results := make(chan error, 2)
 	for _, content := range []string{"first complete file", "second complete file"} {
 		wg.Add(1)
-		go func() { defer wg.Done(); results <- publishNewFile(path, []byte(content)) }()
+		go func() { defer wg.Done(); results <- app.PublishNewFile(path, []byte(content)) }()
 	}
 	wg.Wait()
 	close(results)

@@ -38,7 +38,7 @@ Settled decisions. Do not reopen one unless the user does. When a decision chang
 - A missing `tasks_dir` is created automatically.
 - `internal/git` tests run against real temp repos (`t.TempDir()` + `git init`), no exec mocking. Interactive `huh` prompt paths are not unit tested.
 
-Approved revamp direction (2026-11-25; implementation in progress):
+Approved revamp direction (2026-11-25; CLI completed 2026-11-26):
 
 - [Tasky CLI Revamp spec #1](https://github.com/tintaungkhant/tasky/issues/1) defines the accepted scope and acceptance criteria.
 - Revamp the CLI first; GUI and local web server come later. No additional Workspace grouping layer.
@@ -46,7 +46,15 @@ Approved revamp direction (2026-11-25; implementation in progress):
 - SQLite owns Task identity and mappings independently of names and paths; Git remains authoritative for branch and worktree state.
 - Preserve existing Git workflows and allow users to stop using Tasky without losing code, branches, or worktrees.
 
-The SQLite storage foundation is implemented; CLI integration is pending. See [docs/storage.md](docs/storage.md) for the current integration boundary.
+The CLI revamp and SQLite integration are complete. See [docs/storage.md](docs/storage.md) for current storage behavior and [docs/architecture.md](docs/architecture.md) for shared application ownership.
+
+Approved GUI direction (2026-11-26; planned, not implemented): [spec #22](https://github.com/tintaungkhant/tasky/issues/22), tickets #23–#32.
+
+- `tasky serve` runs a local-only service and prints its web dashboard URL, like MinIO's console; no desktop wrapper or remote access.
+- Frontend: React + TypeScript + shadcn/ui + Tailwind. Built assets ship inside the Go binary; users need no Node installation or separate frontend service.
+- The dashboard covers all current CLI workflows and uses explicit Root selection. Local paths are validated in Go; Git remains authoritative and external changes appear on refresh.
+- CLI and HTTP callers share Go application behavior, including identity checks, cleanup protections, and recovery. The local service protects requests from unrelated websites.
+- Desktop packaging, remote access, user accounts, cloud sync, terminals, and code editing are outside this GUI scope. Existing Git-operation and integration exclusions below still apply.
 
 ### Out of scope
 

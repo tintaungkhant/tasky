@@ -1,4 +1,4 @@
-package cmd
+package app
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 
 // A synced temporary file and exclusive hard link publish complete contents
 // without replacing another command's output or a user's existing file.
-func publishNewFile(path string, data []byte) error {
+func PublishNewFile(path string, data []byte) error {
 	f, err := os.CreateTemp(filepath.Dir(path), ".tasky-output-*")
 	if err != nil {
 		return err

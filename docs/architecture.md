@@ -1,0 +1,61 @@
+# Application operations
+
+`internal/app` coordinates registered Task operations independently of Cobra,
+interactive prompts, output writers, and process-wide command flags. CLI adapters
+collect selections and confirmations, call these operations, and format the
+returned values and errors. The HTTP service is planned in spec #22; it is not
+implemented yet. Future HTTP handlers can call the same operations directly.
+
+## Context and ownership
+
+`app.OpenRegistered(configPath, cwd, rootSelector)` takes the configuration filename
+and directory context explicitly. Callers supply absolute paths; the CLI resolves
+`config.Path()` and `os.Getwd()` at its boundary. The returned Context owns an open
+Store that the caller must close. A nil Context retains the unadopted YAML CLI
+workflow; an explicit or registered Root failure does not silently fall back to
+directory names. Context-relative association paths use its supplied directory,
+not a process-wide `chdir`. `config.LoadFile` and `Config.SaveFile` support explicit
+configuration locations; existing Load/Save preserve environment-based CLI use.
+
+The existing packages remain responsible for their invariants:
+
+- `registry`: Root/Repo registration, filesystem/Git identity, and context selection.
+- `work`: verified Git creation, inspection, reconnection, removal, and recovery.
+- `store`: SQLite identities, same-Root associations, conflicts, journals, and atomic writes.
+- `adopt`: legacy import verification.
+- `config` and `task`: YAML preferences and shared domain calculations.
+
+The application Context combines these rules for Task lookup, branch selection,
+creation and renaming, attach/detach, reconnect, cleanup, recovery, and workspace
+generation. Creation requests and cleanup/recovery options are explicit values.
+Removal receives the expected mapping snapshot; journal checks still reject stale
+ownership or location changes. CLI target selection and prompts remain adapters;
+worktree identity checks and dirty/unmerged protections remain in `work`.
+
+## Files and diagnostics
+
+Workspace generation returns its path and whether identical output already
+existed. The shared publisher syncs a complete file and uses exclusive publication
+to preserve existing files. Workspace content and preservation rules are described
+in [editor.md](editor.md).
+
+Backup decoding accepts a bounded reader, so CLI files and future HTTP uploads use
+the same JSON validation and 64 MiB limit. Restore returns structured location
+warnings after the Store's atomic merge. CLI adapters print those warnings;
+future handlers can serialize them without parsing terminal output. The snapshot
+format and pending-operation safeguards remain owned by the Store; see
+[backup.md](backup.md).
+
+`app.Import` accepts an explicit configuration path, verifies the entire legacy
+input before opening/writing mappings, and returns the adopted Root count. No new
+Git markers, database schema, dependencies, background processes, or public CLI
+commands are introduced by this boundary.
+
+## Verification
+
+`cmd/app_test.go` calls the application directly with a different process directory
+and configuration environment, then checks that CLI inspection and workspace
+generation observe the same data. It also exercises context-relative attach,
+reconnect, detach, dirty protection, and forgetting recovery intent against real
+temporary Git Repos. Existing CLI lifecycle tests remain the behavior-preservation
+boundary. `internal/app/backup_test.go` covers stream validation and oversized input.

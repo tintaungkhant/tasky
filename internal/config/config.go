@@ -45,6 +45,11 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	return LoadFile(path)
+}
+
+// LoadFile reads an explicitly selected configuration without consulting the environment.
+func LoadFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return &Config{}, nil
@@ -65,6 +70,11 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
+	return c.SaveFile(path)
+}
+
+// SaveFile writes an explicitly selected configuration.
+func (c *Config) SaveFile(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
