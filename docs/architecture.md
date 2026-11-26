@@ -37,6 +37,13 @@ list; submission calls `Context.Create` again. Rename scopes an internal Task ID
 to its Root and calls Store's label-only `RenameTask`, also used by the CLI's
 application operation, so a removed Task's public ID cannot retarget a stale form.
 
+Association previews and submissions share `Context`'s checkout verification
+with CLI attach. Store owns the atomic reviewed target/source comparison and
+snapshot detach. HTTP constructs a Context from exact persisted Root/Repo IDs
+without loading unrelated YAML creation settings. Reconnect passes the inspected
+mapping snapshot through `work.Manager.Reconnect` to Store's compare-and-swap;
+HTTP does not resolve the old mapping again by public Task ID or path.
+
 The existing packages remain responsible for their invariants:
 
 - `registry`: Root/Repo registration, filesystem/Git identity, and context selection.

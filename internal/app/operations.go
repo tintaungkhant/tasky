@@ -85,22 +85,30 @@ func (c *Context) Rename(taskID, name string) error {
 }
 
 func (c *Context) Attach(taskID, location, repoSelector, name, from string) (store.Worktree, error) {
+	repo, path, identity, err := c.verifyAttachment(location, repoSelector)
+	if err != nil {
+		return store.Worktree{}, err
+	}
+	return c.Store.Attach(c.Root.ID, taskID, name, repo.ID, path, from, identity)
+}
+
+func (c *Context) verifyAttachment(location, repoSelector string) (store.Repo, string, string, error) {
 	path, _, err := git.VerifyWorktree(c.location(location))
 	if err != nil {
-		return store.Worktree{}, fmt.Errorf("attach made no mapping changes: %w", err)
+		return store.Repo{}, "", "", fmt.Errorf("attach made no mapping changes: %w", err)
 	}
 	ctx, err := c.Registry.Resolve(path, c.Root.ID, repoSelector)
 	if err != nil {
-		return store.Worktree{}, err
+		return store.Repo{}, "", "", err
 	}
 	if err := (work.Manager{Store: c.Store}).Verify(ctx.Repo, path); err != nil {
-		return store.Worktree{}, fmt.Errorf("attach made no mapping changes: %w", err)
+		return store.Repo{}, "", "", fmt.Errorf("attach made no mapping changes: %w", err)
 	}
 	identity, err := git.WorktreeIdentity(path)
 	if err != nil {
-		return store.Worktree{}, err
+		return store.Repo{}, "", "", err
 	}
-	return c.Store.Attach(c.Root.ID, taskID, name, ctx.Repo.ID, path, from, identity)
+	return ctx.Repo, path, identity, nil
 }
 
 func (c *Context) Detach(taskID, location string) (string, error) {
