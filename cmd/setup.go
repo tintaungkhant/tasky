@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	expected := config.Config{Roots: slices.Clone(cfg.Roots)}
 
 	for {
 		printRoots(cfg)
@@ -56,7 +58,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 				return err
 			}
 		case actionDone:
-			if err := cfg.Save(); err != nil {
+			path, err := config.Path()
+			if err != nil {
+				return err
+			}
+			if err := cfg.SaveFileIfUnchanged(path, expected); err != nil {
 				return err
 			}
 			fmt.Println(ui.Success("Config saved."))

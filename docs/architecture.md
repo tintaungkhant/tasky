@@ -18,6 +18,13 @@ directory names. Context-relative association paths use its supplied directory,
 not a process-wide `chdir`. `config.LoadFile` and `Config.SaveFile` support explicit
 configuration locations; existing Load/Save preserve environment-based CLI use.
 
+`app.UpdatePreferences` validates the dashboard's absolute local paths and
+preference fields, then uses `config.SaveFileIfUnchanged`. Config owns locked,
+complete file publication and stale-list detection; CLI `setup` uses that same
+save boundary. Registry still owns registration/Git validation. Store owns
+transactionally consistent Root removal previews and conditional deletion, so
+HTTP confirmation cannot forget mappings created since the preview.
+
 The existing packages remain responsible for their invariants:
 
 - `registry`: Root/Repo registration, filesystem/Git identity, and context selection.

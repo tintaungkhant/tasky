@@ -6,6 +6,13 @@ completion. Use [`tasky import`](adoption.md) before registering an existing YAM
 Root with legacy Tasks. Registration itself does not import those mappings.
 `setup` continues to edit YAML preferences.
 
+The local dashboard's Registration tab provides these registration operations,
+YAML preference editing, and legacy import. It uses explicit IDs and requires a
+mapping preview and checkbox for Root removal; see [service.md](service.md).
+Dashboard removal also blocks pending creation intent, so it cannot discard an
+active operation. CLI `setup` and dashboard preference saves reject stale edits
+and use the shared locked file publisher described there.
+
 ```sh
 tasky root add company /work/company
 tasky root list

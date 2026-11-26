@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/gofrs/flock"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,6 +28,8 @@ type Config struct {
 
 // ErrNoMatchingRoot is returned by MatchRoot when no configured Root contains the given path.
 var ErrNoMatchingRoot = errors.New("no configured root contains this directory; run `tasky setup`")
+
+var ErrChanged = errors.New("preferences changed; reload before saving")
 
 // Path returns the path to tasky's config file, honoring $TASKY_CONFIG for tests.
 func Path() (string, error) {
@@ -75,15 +79,72 @@ func (c *Config) Save() error {
 
 // SaveFile writes an explicitly selected configuration.
 func (c *Config) SaveFile(path string) error {
+	return c.saveFile(path, nil)
+}
+
+func (c *Config) SaveFileIfUnchanged(path string, expected Config) error {
+	return c.saveFile(path, &expected)
+}
+
+func (c *Config) saveFile(path string, expected *Config) error {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
+	}
+	lock := flock.New(path + ".lock")
+	defer lock.Close()
+	locked, err := lock.TryLock()
+	if err != nil {
+		return fmt.Errorf("lock preferences: %w", err)
+	}
+	if !locked {
+		return fmt.Errorf("preferences are being saved by another Tasky process; retry")
+	}
+	if expected != nil {
+		current, err := LoadFile(path)
+		if err != nil {
+			return err
+		}
+		if !slices.Equal(current.Roots, expected.Roots) {
+			return ErrChanged
+		}
 	}
 	data, err := yaml.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("encode config: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return fmt.Errorf("write config: %w", err)
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	}
+	file, err := os.CreateTemp(filepath.Dir(path), ".tasky-config-*")
+	if err != nil {
+		return fmt.Errorf("create temporary config: %w", err)
+	}
+	defer os.Remove(file.Name())
+	defer file.Close()
+	if err := file.Chmod(mode); err != nil {
+		return err
+	}
+	if _, err := file.Write(data); err != nil {
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(file.Name(), path); err != nil {
+		return fmt.Errorf("publish config: %w", err)
 	}
 	return nil
 }

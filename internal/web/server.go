@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
 type Server struct {
+	settingsMu                                    sync.Mutex
 	listener                                      net.Listener
 	http                                          *http.Server
 	origin, accessToken, sessionToken, cookieName string

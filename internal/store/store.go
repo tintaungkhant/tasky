@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 
@@ -151,11 +152,28 @@ func (s *Store) Close() error { return s.db.Close() }
 // RemoveRoot forgets a Root and its mappings in one transaction. It never
 // touches the filesystem or Git; callers must make the mapping loss explicit.
 func (s *Store) RemoveRoot(id string) error {
+	return s.removeRoot(id, nil)
+}
+
+func (s *Store) RemoveRootConfirmed(expected RootMappingSnapshot) error {
+	return s.removeRoot(expected.Root.ID, &expected)
+}
+
+func (s *Store) removeRoot(id string, expected *RootMappingSnapshot) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return writeError("remove Root", err)
 	}
 	defer tx.Rollback()
+	if expected != nil {
+		current, err := rootMappings(tx, id)
+		if err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(current, *expected) {
+			return fmt.Errorf("Root mappings changed; review a fresh removal preview: %w", ErrConflict)
+		}
+	}
 	var pending string
 	err = tx.QueryRow("SELECT id FROM cleanups WHERE root_id = ? LIMIT 1", id).Scan(&pending)
 	if err == nil {

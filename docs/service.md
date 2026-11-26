@@ -17,9 +17,11 @@ The service provides a React dashboard shell with explicit Root selection,
 refresh, connection/error/empty states, and keyboard-accessible section tabs.
 Root options include their name, path, and internal identity; duplicate names
 remain independently selectable. Selection starts empty and is cleared if a
-refresh removes the selected Root. Workflow screens follow in the GUI plan,
+refresh removes the selected Root. Registration supports YAML preferences,
+Root/Repo registration, verified legacy import, and confirmed Root mapping
+removal. Task workflow screens follow in the GUI plan,
 [spec #22](https://github.com/tintaungkhant/tasky/issues/22); use the existing CLI
-commands for those operations today. Production assets are embedded in the Go
+commands for Task operations today. Production assets are embedded in the Go
 binary. Users need no frontend build, Node installation, or separate service.
 
 ## Local access and sessions
@@ -60,6 +62,14 @@ are outside the approved scope.
 | `POST /api/session` | Same-origin `application/json` body with a `token` field from the access link; returns 204 and sets the session cookie. Unknown fields, malformed/trailing JSON, and bodies over 4 KiB are rejected. |
 | `GET /api/status` | Authenticated `{ "status": "ok" }` response without database access. |
 | `GET /api/roots` | Authenticated registered Roots as an array of `{ ID, Name, Path }`; no parameters. Empty registrations return `[]`. |
+| `GET /api/preferences` | YAML preferences as `{ Roots: [{ Name, Path, TasksDir, BranchTemplate }] }`; missing configuration returns an empty list. |
+| `PUT /api/preferences` | `{ expected: <loaded preferences>, config: <edited preferences> }`; validates and saves the entire YAML Root list, rejecting stale edits. |
+| `POST /api/registration/roots` | `{ Name, Path }`; registers an existing Root directory, returning its identity. |
+| `GET /api/repos?root=…` | Lists Repos for exactly one registered Root ID. Names and directory context are not selectors here. |
+| `POST /api/registration/repos` | `{ RootID, Name, Path }`; registers the verified primary Git worktree, including nested/external paths. |
+| `POST /api/import` | Empty JSON object; runs shared verified legacy import against saved YAML preferences. |
+| `GET /api/registration/removal?root=…` | Exact Root ID; returns the Root and every Repo, Task, and worktree mapping that removal would forget. Pending operations block the preview. |
+| `POST /api/registration/remove` | `{ expected: <removal preview>, confirm: true }`; compares the full snapshot in the deletion transaction, rejects stale mappings or pending operations, and forgets only mappings. |
 | `GET /api/context?root=…&repo=…` | Authenticated registered Root/Repo resolution through the shared registry. Both selectors are optional; absent selectors use the directory captured when `serve` started. |
 
 Context requests accept only one `root` and one `repo` selector. Invalid query
@@ -79,7 +89,48 @@ mapping conflicts 409, missing records/endpoints 404, and other operation failur
 500. Wrapped operation messages retain location, partial completion, pending IDs,
 and recovery instructions instead of reducing them to a generic error. Workflow
 endpoints are added by subsequent tickets; they use the same error envelope and
-the existing [application operations](architecture.md).
+the existing [application operations](architecture.md). Registration mutations
+require a single JSON body, reject unknown fields/trailing values/query parameters,
+and limit bodies to 1 MiB. Root/Repo paths must be absolute. Input errors retain
+the relevant path or validation message. Names are labels; registration APIs use
+exact persisted IDs for existing records.
+
+## Registration and preferences
+
+The Registration tab separates three effects:
+
+- YAML preferences: add, edit, or remove entries, including Tasks Directory and
+  Branch Template. Entries are edited by list position, so duplicate names stay
+  independently editable. Save applies the complete displayed list. Root paths
+  must exist and be directories; Tasks Directory may be missing and is not created
+  by saving. Names and Branch Templates cannot be blank. Templates are kept
+  verbatim; Git validates rendered branch names when a Task is created.
+- Registered mappings: add Roots, list/register Repos in the selected Root, or
+  preview and confirm forgetting that Root and all its mappings. Registration
+  does not edit YAML, move directories, or change Git. There is no individual
+  Repo removal command in the current CLI/dashboard.
+- Legacy import: adopts saved YAML configuration and verified existing CLI data
+  through the same operation as `tasky import`. Save preference edits first.
+  Import is repeatable; validation failures and conflicts are displayed without
+  discarding inputs. See [adoption.md](adoption.md) for preservation guarantees.
+
+YAML saving rewrites formatting/comments, like `tasky setup`. Saves publish a
+synced, complete temporary file by rename and preserve existing file permissions
+and configuration symlinks. A small `gofrs/flock` dependency supplies native
+cross-platform file locking. The empty `<config path>.lock` sidecar stays on disk;
+the operating system releases its lock when a process exits. Contending saves
+return an actionable retry error. Dashboard forms and CLI `setup` compare their
+original preference list under that lock before writing, so another Tasky save
+requires reloading stale edits. External editors do not participate in this lock;
+avoid saving the same file simultaneously outside Tasky.
+
+Root removal shows names, paths, IDs, and counts for all affected mappings, then
+requires an explicit checkbox before confirmation. SQLite compares the exact
+preview and deletes in one writer transaction. New, renamed, reassigned, or moved
+mappings invalidate the preview. The dashboard refuses removal with pending
+creation or cleanup intent; inspect/recover it through the CLI first. Removal
+preserves source files, worktree directories, branches, YAML preferences, and
+editor workspace files. Re-registering cannot reconstruct forgotten identities.
 
 ## Verification
 
@@ -111,7 +162,8 @@ npm run lint
 CSS, and local fonts. Commit those assets with the sources: `go build ./...`
 and `go install` then work without Node. `typecheck` runs TypeScript independently;
 `test` runs Vitest/Testing Library in jsdom, checking session exchange, explicit
-Root identity selection, refresh, keyboard tabs, empty states, and errors.
+Root identity selection, refresh, keyboard tabs, empty states, and errors, plus
+YAML editing, Repo registration, repeatable import, and explicit removal consent.
 The generated shadcn components emit Fast Refresh export warnings during lint;
 they do not affect the production build.
 
@@ -123,6 +175,7 @@ regeneration commands are recorded in `AGENTS.md`.
 
 Browser/visual verification was not run (repository permission setting). To
 inspect manually, run `go run . serve`, open its printed URL, check Root selection
-and refresh, then use Tab and arrow keys through the section tabs. Section
-content currently explains which workflows are coming next; it does not mutate
-Tasks or registrations.
+and refresh, then use Tab and arrow keys through the section tabs. On a disposable
+Root, check Registration's YAML add/edit/remove, import, and Root/Repo forms;
+inspect the full removal preview and checkbox before forgetting mappings. Task,
+Recovery, and Backup content still explains which workflows are coming next.

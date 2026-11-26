@@ -11,6 +11,13 @@ async function check(response: Response): Promise<Response> {
   return response
 }
 
+export async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  const options = method === 'GET' ? undefined : {
+    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }
+  return (await check(await (options ? fetch(path, options) : fetch(path)))).json()
+}
+
 export async function connect(): Promise<void> {
   const token = new URLSearchParams(location.hash.slice(1)).get('token')
   // Remove the access credential before doing any asynchronous work.

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { connect, listRoots, type Root } from './api'
+import Registration from './Registration'
 
 const sections = ['Tasks', 'Registration', 'Recovery', 'Backup']
 
@@ -48,7 +49,7 @@ export default function App({ connection = connect }: { connection?: () => Promi
         </div>
         {loading && <p role="status">{attempt === 0 ? 'Connecting to the local service…' : 'Loading Roots…'}</p>}
         {error && <p role="alert">{error}</p>}
-        {!loading && !error && roots.length === 0 && <p role="status">No registered Roots. Use tasky root add in the CLI; dashboard registration is coming next.</p>}
+        {!loading && !error && roots.length === 0 && <p role="status">No registered Roots. Open Registration to configure preferences, register a Root, or import legacy data.</p>}
         {!loading && !error && roots.length > 0 && <p role="status" className="break-words">
           {selected ? `Selected Root: ${selected.Name} — ${selected.Path} (${selected.ID})` : 'Select a Root to continue.'}
         </p>}
@@ -61,8 +62,14 @@ export default function App({ connection = connect }: { connection?: () => Promi
             </TabsList>
           </div>
           {sections.map((section) => <TabsContent key={section} value={section} className="space-y-2 rounded-md border p-4">
+            {section === 'Registration' ? <Registration key={rootID} root={selected} onChanged={async () => {
+              const values = await listRoots()
+              setRoots(values)
+              setRootID((current) => values.some((root) => root.ID === current) ? current : '')
+            }} /> : <>
             <h2 className="text-lg font-medium">{section}</h2>
             <p>{section === 'Tasks' && !selected ? 'Choose a Root above to scope Task operations.' : `${section} workflows will be added in the following dashboard tickets. Use the CLI for these operations today.`}</p>
+            </>}
           </TabsContent>)}
         </Tabs>
       </main>
