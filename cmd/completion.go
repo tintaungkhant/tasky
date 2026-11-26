@@ -75,7 +75,7 @@ func completeTaskID(cmd *cobra.Command, args []string, toComplete string) ([]str
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	} else if c != nil {
 		defer c.Store.Close()
-		entries, err := c.entries()
+		entries, err := c.Entries()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -95,14 +95,14 @@ func completeDeleteArgs(cmd *cobra.Command, args []string, toComplete string) ([
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	} else if c != nil {
 		defer c.Store.Close()
-		entries, err := c.entries()
+		entries, err := c.Entries()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		if len(args) == 0 {
 			return filterPrefix(taskIDs(entries), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}
-		wts, mappings, repos, err := c.worktrees(args[0])
+		wts, mappings, repos, err := c.Worktrees(args[0])
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

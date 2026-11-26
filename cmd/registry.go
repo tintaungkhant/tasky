@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/tintaungkhant/tasky/internal/app"
 	"github.com/tintaungkhant/tasky/internal/config"
 	"github.com/tintaungkhant/tasky/internal/registry"
 	"github.com/tintaungkhant/tasky/internal/store"
@@ -119,7 +119,7 @@ func withRegistry(run func(*cobra.Command, []string, registry.Registry, string) 
 		if err != nil {
 			return err
 		}
-		s, err := store.Open(filepath.Join(filepath.Dir(path), "tasky.sqlite3"))
+		s, err := store.Open(app.DatabasePath(path))
 		if err != nil {
 			return err
 		}

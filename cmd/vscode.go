@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +9,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
+	"github.com/tintaungkhant/tasky/internal/app"
 	"github.com/tintaungkhant/tasky/internal/config"
 	"github.com/tintaungkhant/tasky/internal/git"
 	"github.com/tintaungkhant/tasky/internal/task"
@@ -42,13 +40,8 @@ func init() {
 	rootCmd.AddCommand(vscodeCmd)
 }
 
-type vscodeWorkspace struct {
-	Folders []vscodeFolder `json:"folders"`
-}
-
-type vscodeFolder struct {
-	Path string `json:"path"`
-}
+type vscodeWorkspace = app.Workspace
+type vscodeFolder = app.Folder
 
 func runVSCode(cmd *cobra.Command, args []string) error {
 	if c, err := registeredContext(cmd); err != nil {
@@ -127,22 +120,18 @@ func runVSCode(cmd *cobra.Command, args []string) error {
 }
 
 func writeWorkspace(cmd *cobra.Command, path string, ws vscodeWorkspace) error {
-	data, err := json.MarshalIndent(ws, "", "  ")
+	result, err := app.WriteWorkspace(path, ws)
 	if err != nil {
-		return fmt.Errorf("build workspace file: %w", err)
+		return err
 	}
-
-	if err := publishNewFile(path, data); err != nil {
-		if errors.Is(err, os.ErrExist) {
-			previous, readErr := os.ReadFile(path)
-			if readErr == nil && bytes.Equal(previous, data) {
-				cmd.Printf("Workspace file is current: %s\n", path)
-				return nil
-			}
-			return fmt.Errorf("workspace file %s exists; preserve or move it before regenerating", path)
-		}
-		return fmt.Errorf("write workspace file %s: %w", path, err)
-	}
-	cmd.Printf("Wrote workspace file at %s\n", path)
+	printWorkspace(cmd, result)
 	return nil
+}
+
+func printWorkspace(cmd *cobra.Command, result app.WorkspaceResult) {
+	if result.Current {
+		cmd.Printf("Workspace file is current: %s\n", result.Path)
+	} else {
+		cmd.Printf("Wrote workspace file at %s\n", result.Path)
+	}
 }

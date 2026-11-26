@@ -21,7 +21,7 @@ existing file. Choose a new filename for each backup. Publication uses a hard
 link within the destination directory; choose a filesystem supporting hard links
 (such as NTFS or ordinary Unix filesystems). On an unsupported filesystem it
 fails safely. The temporary file is removed after publication or an ordinary
-failure; an interrupted process may leave a `.tasky-backup-*` temporary file.
+failure; an interrupted process may leave a `.tasky-output-*` temporary file.
 
 ## Safe restoration
 

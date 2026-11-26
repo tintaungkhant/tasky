@@ -2,12 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/tintaungkhant/tasky/internal/task"
-	"github.com/tintaungkhant/tasky/internal/work"
+	"github.com/tintaungkhant/tasky/internal/app"
 )
 
 func runStoredDelete(cmd *cobra.Command, args []string, c *storedContext) error {
@@ -15,7 +12,7 @@ func runStoredDelete(cmd *cobra.Command, args []string, c *storedContext) error 
 	if err != nil {
 		return err
 	}
-	wts, byPath, repos, err := c.worktrees(t.TaskID)
+	wts, byPath, repos, err := c.Worktrees(t.TaskID)
 	if err != nil {
 		return err
 	}
@@ -57,10 +54,8 @@ func runStoredDelete(cmd *cobra.Command, args []string, c *storedContext) error 
 			return fmt.Errorf("aborted")
 		}
 	}
-	m := work.Manager{Store: c.Store}
 	for _, wt := range targets {
 		mapping := byPath[wt.Path]
-		repo := repos[mapping.RepoID]
 		removeBranch := deleteDeleteBranchFlag
 		if len(args) == 0 {
 			removeBranch, err = promptConfirmDefault(fmt.Sprintf("Delete the branch of %s too?", wt.Path), false)
@@ -70,17 +65,10 @@ func runStoredDelete(cmd *cobra.Command, args []string, c *storedContext) error 
 		}
 		forceWorktree, _ := cmd.Flags().GetBool("force-worktree")
 		forceBranch, _ := cmd.Flags().GetBool("force-branch")
-		if err := m.Remove(repo, mapping, removeBranch, deleteForceFlag || forceWorktree, deleteForceFlag || forceBranch); err != nil {
+		if err := c.Remove(mapping, app.RemoveOptions{DeleteBranch: removeBranch, ForceWorktree: deleteForceFlag || forceWorktree, ForceBranch: deleteForceFlag || forceBranch}); err != nil {
 			return fmt.Errorf("earlier removals printed above completed; this and later targets may remain associated; %w", err)
 		}
 		cmd.Printf("Removed worktree and mapping %s (branch deletion requested: %t)\n", wt.Path, removeBranch)
-		// Only remove an empty parent. Workspace files and unrelated files remain.
-		parent := filepath.Dir(wt.Path)
-		owned := work.TaskDirectory(c.Config.TasksDir, t.ID)
-		legacy := filepath.Join(c.Config.TasksDir, task.TaskDirName(t.TaskID, t.Name))
-		if parent == owned || parent == legacy {
-			_ = os.Remove(parent)
-		}
 	}
 	return c.Store.RemoveEmptyTask(t.ID)
 }
@@ -90,45 +78,10 @@ func runStoredVSCode(cmd *cobra.Command, args []string, c *storedContext) error 
 	if err != nil {
 		return err
 	}
-	wts, mappings, repos, err := c.worktrees(t.TaskID)
+	result, err := c.GenerateWorkspace(t.TaskID)
 	if err != nil {
 		return err
 	}
-	if len(wts) == 0 {
-		return fmt.Errorf("no worktrees found for Task %s", t.TaskID)
-	}
-	for _, wt := range wts {
-		mapping := mappings[wt.Path]
-		state := (work.Manager{Store: c.Store}).Inspect(repos[mapping.RepoID], mapping)
-		if state.Status != "ok" {
-			return fmt.Errorf("cannot generate workspace for Task %s: %s [%s]: %s; no workspace written", t.TaskID, wt.Path, state.Status, state.Detail)
-		}
-	}
-	dir := work.TaskDirectory(c.Config.TasksDir, t.ID)
-	filename := t.ID + ".code-workspace"
-	// Preserve the location used by an adopted legacy workspace.
-	legacy := filepath.Join(c.Config.TasksDir, task.TaskDirName(t.TaskID, t.Name))
-	if filepath.Dir(wts[0].Path) == legacy {
-		dir = legacy
-		filename = filepath.Base(legacy) + ".code-workspace"
-	} else {
-		dir, err = work.EnsureTaskDirectory(c.Config.TasksDir, t.ID)
-		if err != nil {
-			return err
-		}
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	ws := vscodeWorkspace{}
-	for _, wt := range wts {
-		rel, err := filepath.Rel(dir, wt.Path)
-		if err != nil {
-			ws.Folders = append(ws.Folders, vscodeFolder{Path: wt.Path})
-			continue
-		}
-		ws.Folders = append(ws.Folders, vscodeFolder{Path: "./" + filepath.ToSlash(rel)})
-	}
-	path := filepath.Join(dir, filename)
-	return writeWorkspace(cmd, path, ws)
+	printWorkspace(cmd, result)
+	return nil
 }

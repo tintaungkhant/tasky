@@ -1,17 +1,13 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/tintaungkhant/tasky/internal/app"
 	"github.com/tintaungkhant/tasky/internal/config"
-	"github.com/tintaungkhant/tasky/internal/git"
 	"github.com/tintaungkhant/tasky/internal/store"
-	"github.com/tintaungkhant/tasky/internal/work"
 )
 
 func init() {
@@ -26,7 +22,7 @@ func mappingDatabase() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(filepath.Dir(path), "tasky.sqlite3"), nil
+	return app.DatabasePath(path), nil
 }
 
 func runBackup(cmd *cobra.Command, args []string) error {
@@ -46,54 +42,15 @@ func runBackup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := writeMappingBackup(args[0], b); err != nil {
+	if err := app.WriteMappingBackup(args[0], b); err != nil {
 		return err
 	}
 	cmd.Printf("Backed up %d Roots, %d Repos, %d Tasks, and %d worktree mappings to %s. Keep the YAML configuration separately.\n", len(b.Roots), len(b.Repos), len(b.Tasks), len(b.Worktrees), args[0])
 	return nil
 }
 
-func writeMappingBackup(path string, b store.MappingBackup) error {
-	data, err := json.MarshalIndent(b, "", "  ")
-	if err != nil {
-		return fmt.Errorf("write backup: %w", err)
-	}
-	return publishNewFile(path, append(data, '\n'))
-}
-
-func readMappingBackup(path string) (store.MappingBackup, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return store.MappingBackup{}, fmt.Errorf("open mapping backup: %w", err)
-	}
-	defer f.Close()
-	// Bound untrusted input before decoding; mapping backups contain metadata only.
-	const maxBackupSize = 64 << 20
-	info, err := f.Stat()
-	if err != nil {
-		return store.MappingBackup{}, err
-	}
-	if !info.Mode().IsRegular() || info.Size() > maxBackupSize {
-		return store.MappingBackup{}, fmt.Errorf("mapping backup must be a regular JSON file of at most 64 MiB")
-	}
-	decoder := json.NewDecoder(io.LimitReader(f, maxBackupSize+1))
-	decoder.DisallowUnknownFields()
-	var b store.MappingBackup
-	if err := decoder.Decode(&b); err != nil {
-		return b, fmt.Errorf("invalid mapping backup: %w", err)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return b, fmt.Errorf("invalid mapping backup: trailing data")
-	}
-	if err := b.Validate(); err != nil {
-		return b, err
-	}
-	return b, nil
-}
-
 func runRestore(cmd *cobra.Command, args []string) error {
-	b, err := readMappingBackup(args[0])
+	b, err := app.ReadMappingBackup(args[0])
 	if err != nil {
 		return err
 	}
@@ -106,30 +63,21 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer s.Close()
-	if err := s.Restore(b); err != nil {
+	report, err := app.Restore(s, b)
+	if err != nil {
 		return err
 	}
 	cmd.Printf("Restored mappings from %s. Existing mappings were preserved; code, branches, and worktrees are unchanged.\n", args[0])
-	for _, root := range b.Roots {
-		if info, err := os.Stat(root.Path); err != nil || !info.IsDir() {
-			cmd.Printf("Review Root %s at %s: location missing, inaccessible, or not a directory; check its location before use.\n", root.ID, root.Path)
+	for _, warning := range report.Warnings {
+		switch warning.Kind {
+		case "Root":
+			cmd.Printf("Review Root %s at %s: location missing, inaccessible, or not a directory; check its location before use.\n", warning.ID, warning.Path)
+		case "Repo":
+			cmd.Printf("Review Repo %s at %s: %s; inspect Git registration before use.\n", warning.ID, warning.Path, warning.Detail)
+		case "worktree":
+			cmd.Printf("Review worktree %s at %s [%s]: %s\n", warning.ID, warning.Path, warning.Status, warning.Detail)
 		}
 	}
-	repos := map[string]store.Repo{}
-	for _, repo := range b.Repos {
-		repos[repo.ID] = repo
-		if _, _, err := git.VerifyWorktree(repo.Path); err != nil {
-			cmd.Printf("Review Repo %s at %s: %v; inspect Git registration before use.\n", repo.ID, repo.Path, err)
-		}
-	}
-	warnings := 0
-	for _, wt := range b.Worktrees {
-		state := (work.Manager{Store: s}).Inspect(repos[wt.RepoID], wt)
-		if state.Status != "ok" {
-			warnings++
-			cmd.Printf("Review worktree %s at %s [%s]: %s\n", wt.ID, wt.Path, state.Status, state.Detail)
-		}
-	}
-	cmd.Printf("Checked %d restored worktree locations against Git; %d require review. Use tasky list, reconnect, or detach after reviewing them.\n", len(b.Worktrees), warnings)
+	cmd.Printf("Checked %d restored worktree locations against Git; %d require review. Use tasky list, reconnect, or detach after reviewing them.\n", len(b.Worktrees), report.WorktreeWarnings)
 	return nil
 }

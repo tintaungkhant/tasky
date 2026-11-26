@@ -2,11 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/tintaungkhant/tasky/internal/git"
-	"github.com/tintaungkhant/tasky/internal/work"
 )
 
 func init() {
@@ -27,28 +24,14 @@ func runAttach(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer c.Store.Close()
-	path, _, err := git.VerifyWorktree(args[1])
-	if err != nil {
-		return fmt.Errorf("attach made no mapping changes: %w", err)
-	}
 	repoSelector, _ := cmd.Flags().GetString("repo")
-	ctx, err := c.Registry.Resolve(path, c.Root.ID, repoSelector)
-	if err != nil {
-		return err
-	}
-	if err := (work.Manager{Store: c.Store}).Verify(ctx.Repo, path); err != nil {
-		return fmt.Errorf("attach made no mapping changes: %w", err)
-	}
 	name, _ := cmd.Flags().GetString("name")
 	from, _ := cmd.Flags().GetString("reassign-from")
-	identity, err := git.WorktreeIdentity(path)
+	wt, err := c.Attach(args[0], args[1], repoSelector, name, from)
 	if err != nil {
 		return err
 	}
-	wt, err := c.Store.Attach(c.Root.ID, args[0], name, ctx.Repo.ID, path, from, identity)
-	if err != nil {
-		return err
-	}
+	path := wt.Path
 	cmd.Printf("Associated %s with Task %s (internal Task %s, worktree %s). Git state is unchanged.\n", path, args[0], wt.TaskID, wt.ID)
 	return nil
 }
@@ -62,16 +45,8 @@ func runDetach(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer c.Store.Close()
-	path, err := filepath.Abs(args[1])
+	path, err := c.Detach(args[0], args[1])
 	if err != nil {
-		return err
-	}
-	// Detaching missing locations must still work. Canonicalize aliases only
-	// when the location is accessible; otherwise use the stored absolute path.
-	if canonical, err := filepath.EvalSymlinks(path); err == nil {
-		path = canonical
-	}
-	if err := c.Store.Detach(c.Root.ID, args[0], path); err != nil {
 		return err
 	}
 	cmd.Printf("Detached mapping for %s from Task %s. Files, worktrees, and branches are preserved.\n", path, args[0])
