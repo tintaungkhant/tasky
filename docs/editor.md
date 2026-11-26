@@ -5,6 +5,12 @@
 Without a Task ID it prompts for a Task. Root selection follows
 [registered context](registration.md), including external Repo worktrees.
 
+In the dashboard, choose a Root and Task, then **Generate editor workspace**.
+The result shows a selectable path to copy and open in a compatible editor.
+The service only generates the file; it does not launch commands or an editor.
+Generation uses the selected Task's internal identity and the same verification
+and file publication as the CLI. YAML preferences supply the Tasks Directory.
+
 Every registered Task association must pass live Git registration, Repo, and
 recorded worktree identity checks. Missing, inaccessible, invalid, or unverified
 associations fail the command with guidance and no new workspace file. Tasky does

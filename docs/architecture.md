@@ -44,6 +44,10 @@ without loading unrelated YAML creation settings. Reconnect passes the inspected
 mapping snapshot through `work.Manager.Reconnect` to Store's compare-and-swap;
 HTTP does not resolve the old mapping again by public Task ID or path.
 
+Editor generation opens the configured Context for the exact Root and selects
+the Task by internal identity. Both callers share the same association snapshot,
+live inspection and workspace publisher; HTTP accepts no command to execute.
+
 The existing packages remain responsible for their invariants:
 
 - `registry`: Root/Repo registration, filesystem/Git identity, and context selection.
