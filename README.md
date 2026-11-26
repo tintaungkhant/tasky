@@ -40,7 +40,8 @@ go build -o tasky .
 ```
 
 For the local dashboard, run `tasky serve` and open its printed URL. The current
-shell provides Root selection and navigation; workflow screens are in progress.
+dashboard provides Root selection, YAML preferences, registration, legacy import,
+and confirmed Root mapping removal; Task workflow screens are in progress.
 Built assets ship in the binary, so Node is only needed when changing frontend
 sources. See [the service and frontend build guide](docs/service.md).
 

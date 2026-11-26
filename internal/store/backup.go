@@ -28,8 +28,8 @@ func noPending(tx *sql.Tx) error {
 	return nil
 }
 
-func readBackupRows(tx *sql.Tx, query string, scan func(*sql.Rows) error) error {
-	rows, err := tx.Query(query)
+func readBackupRows(tx *sql.Tx, query string, scan func(*sql.Rows) error, args ...any) error {
+	rows, err := tx.Query(query, args...)
 	if err != nil {
 		return err
 	}

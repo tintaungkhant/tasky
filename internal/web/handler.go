@@ -73,6 +73,13 @@ func (s *Server) handler() http.Handler {
 	})
 	mux.HandleFunc("/api/context", s.context)
 	mux.HandleFunc("/api/roots", s.roots)
+	mux.HandleFunc("/api/preferences", s.preferences)
+	mux.HandleFunc("/api/import", s.importLegacy)
+	mux.HandleFunc("/api/registration/roots", s.registerRoot)
+	mux.HandleFunc("/api/registration/repos", s.registerRepo)
+	mux.HandleFunc("/api/repos", s.repos)
+	mux.HandleFunc("/api/registration/removal", s.removalPreview)
+	mux.HandleFunc("/api/registration/remove", s.removeRoot)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", fmt.Errorf("endpoint not found"))
 	})
