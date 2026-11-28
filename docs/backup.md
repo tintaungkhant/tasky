@@ -9,6 +9,13 @@ Both commands address all registered Roots in the database beside the YAML
 configuration (`$TASKY_CONFIG` still selects that configuration location).
 They do not depend on current-directory Root selection.
 
+In the dashboard, open **Backup** to download a JSON snapshot or choose a
+snapshot file and click **Restore mappings**. The dashboard and CLI read the
+same format, cover all Roots, and use the same validation and merge behavior.
+After restoring, the dashboard refreshes its Root selector and lists any
+locations requiring review. If a pending operation blocks either action, select
+its Root in **Recovery** and resolve it before retrying.
+
 Backup captures Root, Repo, Task, and worktree identities, names, paths, and
 associations in one consistent SQLite snapshot. The versioned JSON format is
 independent of the SQLite file format. It contains no code, branches, working-tree

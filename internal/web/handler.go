@@ -92,6 +92,8 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("/api/tasks/cleanup", s.cleanup)
 	mux.HandleFunc("/api/pending", s.pending)
 	mux.HandleFunc("/api/recover", s.recover)
+	mux.HandleFunc("/api/backup", s.backup)
+	mux.HandleFunc("/api/restore", s.restore)
 	mux.HandleFunc("/api/registration/removal", s.removalPreview)
 	mux.HandleFunc("/api/registration/remove", s.removeRoot)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

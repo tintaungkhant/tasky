@@ -44,7 +44,8 @@ dashboard provides Root selection, YAML preferences, registration, legacy import
 confirmed Root mapping removal, Task search with live Git inspection, worktree
 creation, Task renaming, reviewed attachment/reassignment, detach, and reconnection.
 Task inspection supports editor workspace generation and reviewed cleanup.
-The Recovery tab handles pending operations; mapping backup screens are in progress.
+The Recovery tab handles pending operations. The Backup tab downloads and restores
+[mapping snapshots](docs/backup.md) for all Roots.
 Built assets ship in the binary, so Node is only needed when changing frontend
 sources. See [the service and frontend build guide](docs/service.md).
 

@@ -1,15 +1,25 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/tintaungkhant/tasky/internal/app"
+	"github.com/tintaungkhant/tasky/internal/config"
+	"github.com/tintaungkhant/tasky/internal/web"
 	"github.com/tintaungkhant/tasky/internal/work"
 )
 
@@ -187,7 +197,7 @@ func TestConcurrentWorkspacePublication(t *testing.T) {
 	}
 }
 
-func TestCLIConcurrentCreationAndRecovery(t *testing.T) {
+func TestCLIAndDashboardConcurrentCreationAndRecovery(t *testing.T) {
 	source, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -205,16 +215,37 @@ func TestCLIConcurrentCreationAndRecovery(t *testing.T) {
 		out, err := command.CombinedOutput()
 		return string(out), err
 	}
+	s := storedDB(t)
+	roots, err := s.ListRoots()
+	if err != nil || len(roots) != 1 {
+		t.Fatalf("Roots: %+v %v", roots, err)
+	}
+	repos, err := s.ListRepos(roots[0].ID)
+	if err != nil || len(repos) != 1 {
+		t.Fatalf("Repos: %+v %v", repos, err)
+	}
+	post := dashboardClient(t, repo)
 	var wg sync.WaitGroup
 	type result struct {
 		out string
 		err error
 	}
-	results := make(chan result, 2)
+	results := make(chan result, 3)
 	for range 2 {
 		wg.Add(1)
 		go func() { defer wg.Done(); out, err := invoke("add", "race", "racing"); results <- result{out, err} }()
 	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		out, status, err := post("/api/tasks/create", map[string]string{
+			"RootID": roots[0].ID, "RepoID": repos[0].ID, "TaskID": "race", "Branch": "racing",
+		})
+		if err == nil && status != http.StatusCreated {
+			err = fmt.Errorf("dashboard status %d", status)
+		}
+		results <- result{out, err}
+	}()
 	wg.Wait()
 	close(results)
 	success := 0
@@ -222,15 +253,12 @@ func TestCLIConcurrentCreationAndRecovery(t *testing.T) {
 		if r.err == nil {
 			success++
 		} else if !strings.Contains(r.out, "already") && !strings.Contains(r.out, "conflict") && !strings.Contains(r.out, "pending") {
-			t.Fatalf("unexplained race failure: %s %v", r.out, r.err)
+			t.Fatalf("unexplained CLI/dashboard race failure: %s %v", r.out, r.err)
 		}
 	}
 	if success != 1 {
-		t.Fatalf("concurrent CLI successes: %d", success)
+		t.Fatalf("concurrent CLI/dashboard successes: %d", success)
 	}
-	s := storedDB(t)
-	roots, _ := s.ListRoots()
-	repos, _ := s.ListRepos(roots[0].ID)
 	task, err := s.FindTask(roots[0].ID, "race")
 	if err != nil {
 		t.Fatal(err)
@@ -259,6 +287,66 @@ func TestCLIConcurrentCreationAndRecovery(t *testing.T) {
 	if len(wts) != 2 {
 		t.Fatalf("recovered mappings: %+v", wts)
 	}
+}
+
+func dashboardClient(t *testing.T, cwd string) func(string, any) (string, int, error) {
+	t.Helper()
+	path, err := config.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := web.New(path, cwd, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- service.Serve(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("dashboard shutdown: %v", err)
+		}
+		service.Close()
+	})
+	access, err := url.Parse(service.URL())
+	if err != nil {
+		t.Fatal("invalid dashboard access URL")
+	}
+	token, err := url.ParseQuery(access.Fragment)
+	if err != nil {
+		t.Fatal("invalid dashboard access fragment")
+	}
+	origin := access.Scheme + "://" + access.Host
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar, Timeout: 30 * time.Second}
+	t.Cleanup(client.CloseIdleConnections)
+	post := func(path string, body any) (string, int, error) {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return "", 0, err
+		}
+		req, err := http.NewRequest(http.MethodPost, origin+path, strings.NewReader(string(data)))
+		if err != nil {
+			return "", 0, err
+		}
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Content-Type", "application/json")
+		response, err := client.Do(req)
+		if err != nil {
+			return "", 0, err
+		}
+		defer response.Body.Close()
+		out, err := io.ReadAll(response.Body)
+		return string(out), response.StatusCode, err
+	}
+	if out, status, err := post("/api/session", map[string]string{"token": token.Get("token")}); err != nil || status != http.StatusNoContent {
+		t.Fatalf("dashboard authentication: %d %s %v", status, out, err)
+	}
+	return post
 }
 
 func TestLegacyWorkspacePreservesUserEditsAndIgnoresDirectories(t *testing.T) {
