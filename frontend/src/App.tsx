@@ -5,6 +5,7 @@ import { connect, listRoots, type Root } from './api'
 import Registration from './Registration'
 import Tasks from './Tasks'
 import Recovery from './Recovery'
+import Backup from './Backup'
 
 const sections = ['Tasks', 'Registration', 'Recovery', 'Backup']
 
@@ -14,7 +15,14 @@ export default function App({ connection = connect }: { connection?: () => Promi
   const [attempt, setAttempt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [section, setSection] = useState('Tasks')
   const selected = roots.find((root) => root.ID === rootID)
+
+  async function refreshRegisteredRoots() {
+    const values = await listRoots()
+    setRoots(values)
+    setRootID((current) => values.some((root) => root.ID === current) ? current : '')
+  }
 
   useEffect(() => {
     let active = true
@@ -57,21 +65,18 @@ export default function App({ connection = connect }: { connection?: () => Promi
         </p>}
       </header>
       <main id="main" tabIndex={-1}>
-        <Tabs defaultValue="Tasks">
+        <Tabs value={section} onValueChange={setSection}>
           <div className="overflow-x-auto pb-1">
             <TabsList aria-label="Dashboard sections">
               {sections.map((section) => <TabsTrigger key={section} value={section}>{section}</TabsTrigger>)}
             </TabsList>
           </div>
-          {sections.map((section) => <TabsContent key={section} value={section} className="space-y-2 rounded-md border p-4">
-            {section === 'Tasks' ? <Tasks root={selected} /> : section === 'Registration' ? <Registration key={rootID} root={selected} onChanged={async () => {
-              const values = await listRoots()
-              setRoots(values)
-              setRootID((current) => values.some((root) => root.ID === current) ? current : '')
-            }} /> : section === 'Recovery' ? <Recovery key={selected?.ID ?? 'none'} root={selected} /> : <>
-            <h2 className="text-lg font-medium">{section}</h2>
-            <p>{section === 'Tasks' && !selected ? 'Choose a Root above to scope Task operations.' : `${section} workflows will be added in the following dashboard tickets. Use the CLI for these operations today.`}</p>
-            </>}
+          {sections.map((value) => <TabsContent key={value} value={value} forceMount={value === 'Backup' || undefined}
+            hidden={value !== section} className="space-y-2 rounded-md border p-4">
+            {value === 'Tasks' && <Tasks root={selected} />}
+            {value === 'Registration' && <Registration key={rootID} root={selected} onChanged={refreshRegisteredRoots} />}
+            {value === 'Recovery' && <Recovery key={selected?.ID ?? 'none'} root={selected} />}
+            {value === 'Backup' && <Backup onRestored={refreshRegisteredRoots} />}
           </TabsContent>)}
         </Tabs>
       </main>

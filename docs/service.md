@@ -22,9 +22,8 @@ Root/Repo registration, verified legacy import, and confirmed Root mapping
 removal. The Tasks tab searches registered Tasks, inspects live Git state,
 creates worktrees, renames Tasks, attaches/detaches checkouts, reconnects moved
 worktrees, generates editor workspaces, and reviews worktree cleanup. Recovery
-lists and resolves durable pending operations. Mapping backup remains the final
-GUI ticket in [spec #22](https://github.com/tintaungkhant/tasky/issues/22).
-Production assets are embedded in the Go
+lists and resolves durable pending operations. Backup downloads and restores
+[mapping snapshots](backup.md) across all Roots. Production assets are embedded in the Go
 binary. Users need no frontend build, Node installation, or separate service.
 
 ## Local access and sessions
@@ -83,6 +82,8 @@ are outside the approved scope.
 | `POST /api/tasks/cleanup` | `{ Review, Confirm: true }`; rechecks the whole selection before starting, then uses shared journaled removal. Returns `{ Completed, Failed, Error, Remaining }`; partial failure stops later targets, retains durable recovery intent, and includes full diagnostics. Stale preflight fails before removal. |
 | `GET /api/pending?root=<ID>` | Lists the selected Root's `Creations` and `Cleanups` with durable IDs, paths, branches, phases, and cleanup options. |
 | `POST /api/recover` | `{ RootID, ID, Options, Confirm: true }`; recovers or forgets the exact scoped pending operation. Options are `Forget`, `ForceWorktree`, `ForceBranch`; forgetting cannot be combined with overrides, and creation recovery accepts no cleanup overrides. |
+| `GET /api/backup` | Downloads the same versioned JSON mapping snapshot as the CLI. Covers all Roots. No query parameters. |
+| `POST /api/restore` | Accepts the raw JSON mapping snapshot as `application/json` (64 MiB maximum). Merges atomically, preserves existing records, and returns `{ Warnings, WorktreeWarnings }` after inspecting restored locations. No query parameters. Pending operations in any Root block backup and restore with 409. |
 | `POST /api/registration/repos` | `{ RootID, Name, Path }`; registers the verified primary Git worktree, including nested/external paths. |
 | `POST /api/import` | Empty JSON object; runs shared verified legacy import against saved YAML preferences. |
 | `GET /api/registration/removal?root=…` | Exact Root ID; returns the Root and every Repo, Task, and worktree mapping that removal would forget. Pending operations block the preview. |
@@ -105,8 +106,8 @@ are 401, Host/Origin failures 403, invalid input/context 400, wrong methods 405,
 mapping conflicts 409, missing records/endpoints 404, and other operation failures
 500. Wrapped operation messages retain location, partial completion, pending IDs,
 and recovery instructions instead of reducing them to a generic error. Workflow
-endpoints are added by subsequent tickets; they use the same error envelope and
-the existing [application operations](architecture.md). Registration and Task mutations
+endpoints use the same error envelope and [application operations](architecture.md).
+Registration and Task mutations
 require a single JSON body, reject unknown fields/trailing values/query parameters,
 and limit bodies to 1 MiB. Root/Repo paths must be absolute. Input errors retain
 the relevant path or validation message. Names are labels; registration APIs use
@@ -134,8 +135,8 @@ inputs and show the complete operation error. If a Task record was established,
 the error identifies it; a reserved creation includes its pending ID, location,
 and `tasky pending`/`tasky recover` instructions. Earlier successful requests remain
 completed. An empty Task, directory, branch, or checkout can remain after a
-failure; refresh inspection and review pending intent before retrying. Recovery
-currently uses the CLI. A disconnected request may also have completed: inspect
+failure; refresh inspection and review pending intent before retrying in Recovery
+or the CLI. A disconnected request may also have completed: inspect
 Git, Tasks, and pending intent before submitting again. Switching Roots or closing
 the form does not cancel an already submitted operation in the original Root.
 
@@ -298,8 +299,7 @@ Root, check Registration's YAML add/edit/remove, import, and Root/Repo forms;
 inspect the full removal preview and checkbox before forgetting mappings. In Tasks,
 search a Unicode name, select a Task with the keyboard, change its Git branch or
 files externally, and click Refresh Tasks. Check detached HEAD and unavailable
-location guidance on disposable worktrees. Backup content still
-explains the remaining workflow. In a disposable Root, use Add worktree
+location guidance on disposable worktrees. In a disposable Root, use Add worktree
 with a new templated branch, an existing branch, and a verbatim branch/base.
 Repeat across Repos, then rename the Task and confirm paths and branches stay
 unchanged. A failed creation must show its error and any pending recovery guidance.
@@ -327,3 +327,13 @@ parent and child navigation, keyboard selection, Escape/Cancel preserving the
 previous value, and selection changing only the intended field without submitting
 its form. Check an empty folder and invalid path/retry states. Confirm saving
 still validates Root/Repo paths and Git identity through the normal operation.
+
+In Backup, download the snapshot and verify it contains mappings for every
+disposable Root regardless of selection. Start `tasky serve --port 0` with
+`TASKY_CONFIG` pointing at a separate disposable configuration path. Upload the
+snapshot in that dashboard and check the refreshed Root list and Task identities.
+Repeat the restore, check a conflicting or malformed file produces a clear error
+without changing any mappings, and check stale paths produce warnings after a
+successful restore. With a pending operation, both actions should direct you to
+Recovery. Use Tab and Enter to select the file and submit, and check the
+loading and error feedback. Keep both instances separate from your normal data.

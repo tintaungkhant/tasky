@@ -2,10 +2,13 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 )
+
+var ErrBackupPending = errors.New("pending creation or cleanup intent exists; inspect tasky pending for each Root, then recover or explicitly --forget it before backup or restore")
 
 // MappingBackup is a versioned logical snapshot, independent of SQLite's file
 // format. It deliberately contains no code, live branch state, or YAML settings.
@@ -23,7 +26,7 @@ func noPending(tx *sql.Tx) error {
 		return err
 	}
 	if n != 0 {
-		return fmt.Errorf("pending creation or cleanup intent exists; inspect tasky pending for each Root, then recover or explicitly --forget it before backup or restore")
+		return ErrBackupPending
 	}
 	return nil
 }

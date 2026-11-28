@@ -35,3 +35,26 @@ export async function connect(): Promise<void> {
 export async function listRoots(): Promise<Root[]> {
   return (await check(await fetch('/api/roots'))).json()
 }
+
+type RestoreWarning = { Kind: string; ID: string; Path: string; Status: string; Detail: string }
+type RestoreReport = { Warnings: RestoreWarning[] | null }
+
+export async function downloadMappingBackup(): Promise<void> {
+  const response = await check(await fetch('/api/backup'))
+  const url = URL.createObjectURL(await response.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'tasky-mappings.json'
+  try {
+    link.click()
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+}
+
+export async function restoreMappingBackup(file: File): Promise<RestoreReport> {
+  const response = await check(await fetch('/api/restore', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: file,
+  }))
+  return response.json()
+}
