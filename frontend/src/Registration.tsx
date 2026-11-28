@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentProps, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { request, type Root } from './api'
+import FolderPicker from './FolderPicker'
 
 type Preferences = { Roots: { Name: string; Path: string; TasksDir: string; BranchTemplate: string }[] }
 type Repo = Root & { RootID: string }
@@ -22,7 +23,7 @@ function RegisterForm({ kind, save }: { kind: 'Root' | 'Repo'; save: (values: { 
   }
   return <form aria-label={`Register ${kind}`} onSubmit={submit} className="space-y-3 rounded-md border p-4">
     <h3 className="font-medium">Register {kind}</h3>
-    <Field label="Name" name="Name" /><Field label="Path" name="Path" placeholder="Absolute local directory" />
+    <Field label="Name" name="Name" /><FolderPicker label="Path" name="Path" required defaultValue="" placeholder="Absolute local directory" />
     <Button type="submit">Register {kind}</Button>
   </form>
 }
@@ -92,8 +93,8 @@ export default function Registration({ root, onChanged }: { root?: Root; onChang
         {draft.Roots.map((item, index) => <fieldset key={index} className="space-y-2 rounded-md border p-3">
           <legend>YAML Root {index + 1}</legend>
           <Field label="Root name" value={item.Name} onChange={(e) => edit(index, 'Name', e.target.value)} />
-          <Field label="Root path" value={item.Path} onChange={(e) => edit(index, 'Path', e.target.value)} />
-          <Field label="Tasks Directory" value={item.TasksDir} onChange={(e) => edit(index, 'TasksDir', e.target.value)} />
+          <FolderPicker label="Root path" value={item.Path} onChange={(e) => edit(index, 'Path', e.target.value)} />
+          <FolderPicker label="Tasks Directory" value={item.TasksDir} onChange={(e) => edit(index, 'TasksDir', e.target.value)} />
           <Field label="Branch Template" value={item.BranchTemplate} onChange={(e) => edit(index, 'BranchTemplate', e.target.value)} />
           <Button type="button" variant="outline" onClick={() => setDraft({ Roots: draft.Roots.filter((_, i) => i !== index) })}>Remove YAML entry {index + 1}</Button>
         </fieldset>)}

@@ -65,6 +65,7 @@ are outside the approved scope.
 | `POST /api/session` | Same-origin `application/json` body with a `token` field from the access link; returns 204 and sets the session cookie. Unknown fields, malformed/trailing JSON, and bodies over 4 KiB are rejected. |
 | `GET /api/status` | Authenticated `{ "status": "ok" }` response without database access. |
 | `GET /api/roots` | Authenticated registered Roots as an array of `{ ID, Name, Path }`; no parameters. Empty registrations return `[]`. |
+| `GET /api/folders?path=<absolute path>` | Lists directories only, returning canonical `Path`, `Parent` (empty at filesystem root), `Directories` and shortcut `Locations` as `{ Name, Path }` entries. Missing/empty path starts at the service's captured working directory. Uses the same session/Host/Origin protections as other API calls, without opening a database or modifying the filesystem. |
 | `GET /api/preferences` | YAML preferences as `{ Roots: [{ Name, Path, TasksDir, BranchTemplate }] }`; missing configuration returns an empty list. |
 | `PUT /api/preferences` | `{ expected: <loaded preferences>, config: <edited preferences> }`; validates and saves the entire YAML Root list, rejecting stale edits. |
 | `POST /api/registration/roots` | `{ Name, Path }`; registers an existing Root directory, returning its identity. |
@@ -171,6 +172,18 @@ not a Root name or inferred current directory, and does not depend on YAML
 preferences or the continued existence of the Root directory.
 
 ## Registration and preferences
+
+Root and Repo registration paths, YAML Root paths, and Tasks Directory fields
+have a **Browse…** action. Navigate folders or choose Home, the starting folder,
+or a filesystem root (Windows drive roots are listed). Select the current folder
+to fill that field, or cancel to preserve its value. Only directory names/paths
+are listed; file contents are not exposed and files are not uploaded. Directory
+symlinks can be navigated when accessible; the selected path is canonicalized.
+The service's filesystem permissions apply. Unavailable or inaccessible folders
+show errors, and the starting-folder shortcut permits retrying an invalid input.
+Selecting does not save/register anything; existing server validation still runs
+on submission. Typed paths remain supported, including a not-yet-created Tasks
+Directory. The picker selects existing directories and does not create folders.
 
 The Registration tab separates three effects:
 
@@ -309,3 +322,8 @@ Verify unmerged-branch protection separately, replacement identity refusal, and
 preservation of user-edited workspace files outside removed checkouts. Confirm
 Forget intent leaves files, mappings, and branches intact. Use Tab through all
 confirmation controls and check loading, empty, error, and retry states.
+In Registration, use Browse beside each path field. Check drive/Home shortcuts,
+parent and child navigation, keyboard selection, Escape/Cancel preserving the
+previous value, and selection changing only the intended field without submitting
+its form. Check an empty folder and invalid path/retry states. Confirm saving
+still validates Root/Repo paths and Git identity through the normal operation.

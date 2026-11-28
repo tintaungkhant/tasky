@@ -1,14 +1,29 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import Registration from './Registration'
 
 const root = { ID: 'root-two', Name: 'same', Path: 'C:/two' }
 const cfg = { Roots: [{ Name: 'same', Path: 'C:/two', TasksDir: 'C:/tasks', BranchTemplate: '{branch}' }] }
+beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true, value(this: HTMLDialogElement) { this.setAttribute('open', '') },
+  })
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true, value(this: HTMLDialogElement) {
+      this.removeAttribute('open')
+      this.dispatchEvent(new Event('close'))
+    },
+  })
+})
 function mockAPI() {
   const fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
     if (options?.method) return Promise.resolve(new Response('{}'))
     if (url === '/api/preferences') return Promise.resolve(new Response(JSON.stringify(cfg)))
+    if (url.startsWith('/api/folders')) return Promise.resolve(new Response(JSON.stringify({
+      Path: 'C:/tasks/new', Parent: 'C:/tasks', Directories: [],
+      Locations: [{ Name: 'Start folder', Path: 'C:/app' }],
+    })))
     if (url.includes('/removal')) return Promise.resolve(new Response(JSON.stringify({ Root: root, Repos: [], Tasks: [{ ID: 'task-one', TaskID: 'T-1', Name: 'Keep code' }], Worktrees: [] })))
     return Promise.resolve(new Response('[]'))
   })
@@ -26,6 +41,38 @@ it('edits YAML preferences independently and sends the original snapshot', async
   const call = fetch.mock.calls.find(([, options]) => options?.method === 'PUT')!
   expect(call[0]).toBe('/api/preferences')
   expect(JSON.parse(call[1].body as string)).toEqual({ expected: cfg, config: { Roots: [{ ...cfg.Roots[0], BranchTemplate: 'task/' }] } })
+})
+
+it('browses a YAML Tasks Directory without changing other preferences or adding a Branch Template browser', async () => {
+  const fetch = mockAPI(), user = userEvent.setup()
+  render(<Registration onChanged={async () => {}} />)
+  const form = await screen.findByRole('form', { name: 'YAML preferences' })
+  await user.click(within(form).getByRole('button', { name: 'Browse Tasks Directory' }))
+  const dialog = screen.getByRole('dialog', { name: 'Choose a folder for Tasks Directory' })
+  await within(dialog).findByRole('button', { name: 'Start folder' })
+  await user.click(within(dialog).getByRole('button', { name: 'Select this folder' }))
+  expect(within(form).getByLabelText('Tasks Directory')).toHaveValue('C:/tasks/new')
+  expect(within(form).getByLabelText('Root path')).toHaveValue('C:/two')
+  expect(within(form).queryByRole('button', { name: 'Browse Branch Template' })).not.toBeInTheDocument()
+  await user.click(within(form).getByRole('button', { name: 'Save YAML preferences' }))
+  const call = fetch.mock.calls.find(([, options]) => options?.method === 'PUT')!
+  expect(JSON.parse(call[1].body as string)).toEqual({ expected: cfg, config: { Roots: [{ ...cfg.Roots[0], TasksDir: 'C:/tasks/new' }] } })
+})
+
+it('keeps the selected registration path in FormData and resets it after a successful registration', async () => {
+  const fetch = mockAPI(), user = userEvent.setup()
+  render(<Registration onChanged={async () => {}} />)
+  const form = await screen.findByRole('form', { name: 'Register Root' })
+  await user.type(within(form).getByLabelText('Name'), 'new root')
+  await user.click(within(form).getByRole('button', { name: 'Browse Path' }))
+  const dialog = screen.getByRole('dialog', { name: 'Choose a folder for Path' })
+  await within(dialog).findByRole('button', { name: 'Start folder' })
+  await user.click(within(dialog).getByRole('button', { name: 'Select this folder' }))
+  expect(within(form).getByLabelText('Path')).toHaveValue('C:/tasks/new')
+  await user.click(within(form).getByRole('button', { name: 'Register Root' }))
+  const call = fetch.mock.calls.find(([url]) => url === '/api/registration/roots')!
+  expect(JSON.parse(call[1].body as string)).toEqual({ Name: 'new root', Path: 'C:/tasks/new' })
+  expect(within(form).getByLabelText('Path')).toHaveValue('')
 })
 
 it('requires a preview and explicit confirmation before forgetting the selected Root identity', async () => {
