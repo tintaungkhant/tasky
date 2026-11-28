@@ -73,6 +73,7 @@ func (s *Server) handler() http.Handler {
 	})
 	mux.HandleFunc("/api/context", s.context)
 	mux.HandleFunc("/api/roots", s.roots)
+	mux.HandleFunc("/api/folders", s.folders)
 	mux.HandleFunc("/api/preferences", s.preferences)
 	mux.HandleFunc("/api/import", s.importLegacy)
 	mux.HandleFunc("/api/registration/roots", s.registerRoot)

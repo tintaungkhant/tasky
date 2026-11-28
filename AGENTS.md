@@ -62,6 +62,7 @@ Approved GUI direction (2026-11-26; implementation in progress): [spec #22](http
 - The dashboard covers all current CLI workflows and uses explicit Root selection. Local paths are validated in Go; Git remains authoritative and external changes appear on refresh.
 - CLI and HTTP callers share Go application behavior, including identity checks, cleanup protections, and recovery. The local service protects requests from unrelated websites.
 - Keep dashboard visuals plain and functional; reuse generated shadcn/ui components and native controls before adding custom UI code (2026-11-26).
+- Registration path fields support browsing existing folders through the protected local service; retain typed paths and validate them again on save. No desktop wrapper or file upload is needed (2026-11-28).
 - Desktop packaging, remote access, user accounts, cloud sync, terminals, and code editing are outside this GUI scope. Existing Git-operation and integration exclusions below still apply.
 
 ### Out of scope
